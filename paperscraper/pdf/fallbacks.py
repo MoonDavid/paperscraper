@@ -16,6 +16,7 @@ import boto3
 import requests
 from lxml import etree
 from tqdm import tqdm
+from bs4 import BeautifulSoup
 
 ELIFE_XML_INDEX = None  # global variable to cache the eLife XML index from GitHub
 
@@ -159,7 +160,10 @@ def fallback_bioc_pmc(doi: str, output_path: Path) -> bool:
 
 
 def fallback_elsevier_api(
-    paper_metadata: Dict[str, Any], output_path: Path, api_keys: Dict[str, str]
+    paper_metadata: Dict[str, Any],
+    output_path: Path,
+    api_keys: Dict[str, str],
+    preferred_type: str = "xml",
 ) -> bool:
     """
     Attempt to download the full text via the Elsevier TDM API.
@@ -169,49 +173,80 @@ def fallback_elsevier_api(
 
     Args:
         paper_metadata (Dict[str, Any]): Dictionary containing paper metadata. Must include the 'doi' key.
-        output_path (Path): A pathlib.Path object representing the path where the XML file will be saved.
+        output_path (Path): A pathlib.Path object representing the path where the file will be saved.
         api_keys (Dict[str, str]): A dictionary containing API keys. Must include the key "ELSEVIER_TDM_API_KEY".
+        preferred_type (str): The preferred file type to download, either "xml" or "pdf". Defaults to "xml".
 
     Returns:
-        bool: True if the XML file was successfully downloaded, False otherwise.
+        bool: True if the file was successfully downloaded, False otherwise.
     """
     elsevier_api_key = api_keys.get("ELSEVIER_TDM_API_KEY")
+    if not elsevier_api_key:
+        logger.info("No Elsevier API key found, skipping Elsevier fallback.")
+        return False
+
+    if preferred_type not in ["xml", "pdf"]:
+        logger.warning(
+            f"Invalid preferred_type '{preferred_type}'. Defaulting to 'xml'."
+        )
+        preferred_type = "xml"
+
     doi = paper_metadata["doi"]
-    api_url = f"https://api.elsevier.com/content/article/doi/{doi}?apiKey={elsevier_api_key}&httpAccept=text%2Fxml"
-    logger.info(f"Attempting download via Elsevier API (XML) for {doi}: {api_url}")
-    headers = {"Accept": "application/xml"}
+    api_url = f"https://api.elsevier.com/content/article/doi/{doi}"
+    accept_header = (
+        "application/xml" if preferred_type == "xml" else "application/pdf"
+    )
+    headers = {"Accept": accept_header, "X-ELS-APIKey": elsevier_api_key}
+
+    logger.info(
+        f"Attempting download via Elsevier API ({preferred_type.upper()}) for {doi}"
+    )
+
     try:
         response = requests.get(api_url, headers=headers, timeout=60)
 
-        # Check for 401 error and look for APIKEY_INVALID in the response
-        if response.status_code == 401:
+        if response.status_code in [401, 403]:
             error_text = response.text
             if "APIKEY_INVALID" in error_text:
-                logger.error("Invalid API key. Couldn't download via Elsevier XML API")
+                logger.error(
+                    "Invalid API key. Couldn't download via Elsevier API."
+                )
             else:
-                logger.error("401 Unauthorized. Couldn't download via Elsevier XML API")
+                logger.error(
+                    f"{response.status_code} Unauthorized/Forbidden. Couldn't download via Elsevier API."
+                )
             return False
 
         response.raise_for_status()
 
-        # Attempt to parse it with lxml to confirm it's valid XML
-        try:
-            etree.fromstring(response.content)
-        except etree.XMLSyntaxError as e:
-            logger.warning(f"Elsevier API returned invalid XML for {doi}: {e}")
-            return False
+        content = response.content
+        file_path = output_path.with_suffix(f".{preferred_type}")
 
-        xml_path = output_path.with_suffix(".xml")
-        with open(xml_path, "wb") as f:
-            f.write(response.content)
+        if preferred_type == "xml":
+            try:
+                etree.fromstring(content)
+            except etree.XMLSyntaxError as e:
+                logger.warning(
+                    f"Elsevier API returned invalid XML for {doi}: {e}"
+                )
+                return False
+        elif preferred_type == "pdf":
+            if not content.startswith(b"%PDF"):
+                logger.warning(
+                    f"Elsevier API did not return a valid PDF for {doi}."
+                )
+                return False
+
+        with open(file_path, "wb") as f:
+            f.write(content)
         logger.info(
-            f"Successfully used Elsevier API to downloaded XML for {doi} to {xml_path}"
+            f"Successfully downloaded {preferred_type.upper()} via Elsevier API for {doi} to {file_path}"
         )
         return True
-    except Exception as e:
-        logger.error(f"Could not download via Elsevier XML API: {e}")
-        return False
 
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Could not download via Elsevier API for {doi}: {e}")
+        return False
 
 def fallback_elife_xml(doi: str, output_path: Path) -> bool:
     """
@@ -457,10 +492,250 @@ def fallback_s3(
     return False
 
 
+def fallback_unpaywall(doi: str, output_path: Union[str,Path], mail: str, final_url: str) -> bool:
+    """
+    Attempt to download the PDF via Unpaywall.
+    Unpaywall is a service that finds open access versions of paywalled articles.
+    Args:
+        doi (str): The DOI of the paper to retrieve.
+        output_path (Path): A pathlib.Path object representing the path where the PDF will be saved.
+        mail (str): Email address to use for Unpaywall API requests.
+        final_url (str): The redirected URL of the DOI
+    Returns:
+        bool: True if the PDF file was successfully downloaded, False otherwise.
+    """
+    if type(output_path) is str:
+        output_path = Path(output_path)
+    unpaywall_url = f"https://api.unpaywall.org/v2/{doi}?email={mail}"
+    try:
+        response = requests.get(unpaywall_url, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        if not data.get("is_oa", False):
+            logger.info(f"No open access version found for {doi} on Unpaywall.")
+            return False
+        pdf_url = data.get("best_oa_location", {}).get("url_for_pdf", None)
+        if final_url== pdf_url:
+            logger.info(f"Unpaywall returned the same URL as the redirected URL for {doi}")
+            return False
+
+        if pdf_url:
+            pdf_response = requests.get(pdf_url, timeout=60)
+            pdf_response.raise_for_status()
+            if pdf_response.content[:4] == b"%PDF":
+                with open(output_path.with_suffix(".pdf"), "wb+") as f:
+                    f.write(pdf_response.content)
+                logger.info(f"Successfully downloaded PDF via Unpaywall for {doi}.")
+                return True
+            else:
+                logger.warning(f"Unpaywall URL for {doi} did not return a valid PDF.")
+                return False
+        else:
+            logger.info(f"No open access PDF found on Unpaywall for {doi}.")
+            return False
+    except Exception as e:
+        logger.warning(f"Error during Unpaywall fallback for {doi}: {e}")
+        return False
+
+def fallback_springer_api(
+    paper_metadata: Dict[str, Any],
+    output_path: Path,
+    api_keys: Dict[str, str],
+) -> bool:
+    """
+    Attempt to download the PDF via the Springer Nature API.
+    This function uses the SPRINGER_API_KEY environment variable to authenticate.
+    See https://dev.springernature.com/ for details on how to get an API key.
+    Args:
+        paper_metadata (dict): Dictionary containing paper metadata. Must include the 'doi' key.
+        output_path (Path): A pathlib.Path object representing the path where the PDF will be saved.
+        api_keys (dict): Preloaded API keys.
+    Returns:
+        bool: True if the PDF file was successfully downloaded, False otherwise.
+    """
+    springer_api_key = api_keys.get("SPRINGER_API_KEY")
+    if not springer_api_key:
+        logger.info("No Springer API key found, skipping Springer fallback.")
+        return False
+
+    doi = paper_metadata["doi"]
+    # Try open access endpoint first
+    api_url = f"https://api.springernature.com/openaccess/v2/json?q=doi:{doi}&api_key={springer_api_key}"
+    try:
+        response = requests.get(api_url, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("records"):
+            pdf_url = data["records"][0].get("url")
+            if pdf_url:
+                # The URL is often a list, take the first one which is usually the PDF
+                if isinstance(pdf_url, list):
+                    pdf_url = pdf_url[0]["url"]
+
+                pdf_response = requests.get(pdf_url, timeout=60)
+                pdf_response.raise_for_status()
+                if pdf_response.content[:4] == b"%PDF":
+                    with open(output_path.with_suffix(".pdf"), "wb+") as f:
+                        f.write(pdf_response.content)
+                    logger.info(f"Successfully downloaded PDF via Springer Open Access API for {doi}.")
+                    return True
+
+    except Exception as e:
+        logger.info(f"Springer Open Access API failed for {doi}: {e}. Trying metadata API.")
+
+    # Fallback to metadata API (TDM)
+    api_url = f"https://api.springernature.com/metadata/v2/json?q=doi:{doi}&api_key={springer_api_key}"
+    try:
+        response = requests.get(api_url, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("records"):
+            pdf_url = data["records"][0].get("url")
+            if pdf_url:
+                if isinstance(pdf_url, list):
+                    pdf_url = pdf_url[0]["url"]
+
+                pdf_response = requests.get(pdf_url, timeout=60)
+                pdf_response.raise_for_status()
+                if pdf_response.content[:4] == b"%PDF":
+                    with open(output_path.with_suffix(".pdf"), "wb+") as f:
+                        f.write(pdf_response.content)
+                    logger.info(f"Successfully downloaded PDF via Springer Metadata API for {doi}.")
+                    return True
+    except Exception as e:
+        logger.error(f"Could not download via Springer API for {doi}: {e}")
+
+    return False
+
+
+def fallback_plos_api(doi: str, output_path: Path) -> bool:
+    """
+    Attempt to download the PDF from PLOS journals.
+    PLOS articles are open access and their PDFs can often be downloaded directly.
+    Args:
+        doi (str): The DOI of the paper to retrieve.
+        output_path (Path): A pathlib.Path object representing the path where the PDF will be saved.
+    Returns:
+        bool: True if the PDF file was successfully downloaded, False otherwise.
+    """
+    if "plos" not in doi.lower():
+        return False
+    try:
+        # Construct the URL based on common PLOS URL patterns
+        # e.g., https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0000001&type=printable
+        journal_match = re.search(r'journal\.(\w+)', doi)
+        if not journal_match:
+            logger.warning(f"Could not determine PLOS journal from DOI: {doi}")
+            return False
+        journal_short_name = journal_match.group(1)
+        # 'pone' is a special case, it maps to 'plosone' in the URL
+        if journal_short_name == 'pone':
+            journal_name = 'plosone'
+        else:
+            journal_name = f'plos{journal_short_name}'
+
+        pdf_url = f"https://journals.plos.org/{journal_name}/article/file?id={doi}&type=printable"
+
+        pdf_response = requests.get(pdf_url, timeout=60)
+        pdf_response.raise_for_status()
+        if pdf_response.content[:4] == b"%PDF":
+            with open(output_path.with_suffix(".pdf"), "wb+") as f:
+                f.write(pdf_response.content)
+            logger.info(f"Successfully downloaded PDF from PLOS for {doi}.")
+            return True
+        else:
+            logger.warning(f"PLOS URL for {doi} did not return a valid PDF.")
+            return False
+    except Exception as e:
+        logger.error(f"Error during PLOS fallback for {doi}: {e}")
+        return False
+
+
+
+def fallback_europepmc(doi: str, output_path: Path) -> bool:
+    """
+    Attempt to download the XML via Europe PMC.
+
+    This function first converts a given DOI to a PMCID using the Europe PMC REST API.
+    If a PMCID is found, it attempts to download the full-text XML from Europe PMC.
+
+    Europe PMC is a repository of biomedical and life sciences literature that provides
+    free access to abstracts and full-text articles.
+
+    Args:
+        doi (str): The DOI of the paper to retrieve.
+        output_path (Path): A pathlib.Path object representing the path where the XML file will be saved.
+
+    Returns:
+        bool: True if the XML file was successfully downloaded, False otherwise.
+    """
+    # First, search for the article using DOI to get PMCID
+    search_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+    search_params = {
+        "query": f'DOI:"{doi}"',
+        "format": "json",
+        "resultType": "core"
+    }
+
+    try:
+        search_response = requests.get(search_url, params=search_params, timeout=60)
+        search_response.raise_for_status()
+        search_data = search_response.json()
+
+        results = search_data.get("resultList", {}).get("result", [])
+        if not results:
+            logger.warning(f"No results found for DOI {doi} in Europe PMC.")
+            return False
+
+        # Search through all results to find one with a PMCID
+        pmcid = None
+        for result in results:
+            candidate_pmcid = result.get("pmcid")
+            if candidate_pmcid:
+                pmcid = candidate_pmcid
+                logger.info(f"Found PMCID {pmcid} for DOI {doi} in Europe PMC (result {results.index(result) + 1} of {len(results)}).")
+                break
+
+        if not pmcid:
+            logger.warning(f"No PMCID available for DOI {doi} in Europe PMC (searched {len(results)} results).")
+            return False
+
+    except Exception as search_err:
+        logger.error(f"Error searching Europe PMC for DOI {doi}: {search_err}")
+        return False
+
+    # Download full-text XML using PMCID
+    xml_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML"
+
+    try:
+        xml_response = requests.get(xml_url, timeout=60)
+        xml_response.raise_for_status()
+
+        # Check if we got valid XML content
+        xml_content = xml_response.content
+        if xml_content.startswith(b"<?xml") or xml_content.startswith(b"<"):
+            xml_path = output_path.with_suffix(".xml")
+            with open(xml_path, "wb") as f:
+                f.write(xml_content)
+            logger.info(f"Successfully downloaded XML from Europe PMC for DOI {doi} to {xml_path}.")
+            return True
+        else:
+            logger.warning(f"Europe PMC did not return valid XML for DOI {doi}.")
+            return False
+
+    except Exception as xml_err:
+        logger.error(f"Failed to download XML from Europe PMC for DOI {doi}: {xml_err}")
+        return False
+
+
 FALLBACKS: Dict[str, Callable] = {
     "bioc_pmc": fallback_bioc_pmc,
     "elife": fallback_elife_xml,
     "elsevier": fallback_elsevier_api,
+    "europepmc": fallback_europepmc,
     "s3": fallback_s3,
     "wiley": fallback_wiley_api,
+    "unpaywall": fallback_unpaywall,
+    "springer": fallback_springer_api,
+    "plos": fallback_plos_api,
 }
