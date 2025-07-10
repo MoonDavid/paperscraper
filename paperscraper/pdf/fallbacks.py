@@ -92,7 +92,7 @@ def fallback_wiley_api(
     return success
 
 
-def fallback_bioc_pmc(doi: str, output_path: Path) -> bool:
+def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@example.com") -> bool:
     """
     Attempt to download the XML via the BioC-PMC fallback.
 
@@ -111,7 +111,6 @@ def fallback_bioc_pmc(doi: str, output_path: Path) -> bool:
         bool: True if the XML file was successfully downloaded, False otherwise.
     """
     ncbi_tool = "paperscraper"
-    ncbi_email = "your_email@example.com"
 
     converter_url = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
     params = {

@@ -147,7 +147,7 @@ def save_pdf(
     if FALLBACKS["europepmc"](doi, output_path):
         return
 
-    if FALLBACKS["bioc_pmc"](doi, output_path):
+    if FALLBACKS["bioc_pmc"](doi, output_path,mail):
         return
 
     if (
