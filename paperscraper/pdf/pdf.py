@@ -71,8 +71,8 @@ def save_pdf(
     # === Primary attempt: resolve DOI and fetch citation_pdf_url ===
     try:
         response = requests.get(url, timeout=60)
-        response.raise_for_status()
         final_url = response.url
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, features="lxml")
 
         meta_pdf = soup.find("meta", {"name": "citation_pdf_url"})
