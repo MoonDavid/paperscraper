@@ -90,6 +90,7 @@ def save_pdf(
 
     except Exception as e:
         logger.warning(f"Could not download from {final_url or url}: {e}. Trying fallbacks.")
+        final_url= final_url or url
 
     # === If successful, optionally save metadata ===
     if success:
@@ -132,8 +133,8 @@ def save_pdf(
 
     # === Fallbacks: Publisher-aware routing ===
     logger.info(f"Primary download failed for {doi}. Attempting fallbacks.")
-    domain = tldextract.extract(final_url or url).domain.lower() if (final_url or url) else ""
-    logger.info(f"Resolved domain for DOI {doi}: '{domain}' (from {final_url or url})")
+    domain = tldextract.extract(final_url).domain.lower() if (final_url) else ""
+    logger.info(f"Resolved domain for DOI {doi}: '{domain}' (from {final_url})")
 
     # Publisher-specific fallbacks first
     if "plos" in domain:
