@@ -27,6 +27,47 @@ ABSTRACT_ATTRIBUTE = {
 }
 DEFAULT_ATTRIBUTES = ["citation_abstract", "description"]
 
+# python
+def _get_abstract_pubmed(pmid: str, timeout: int = 20) -> Optional[str]:
+    """
+    Query NCBI EFetch for PubMed and return the abstract text or None.
+    Uses the XML retmode and extracts all AbstractText nodes.
+    """
+    try:
+        url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+        params = {"db": "pubmed", "id": pmid, "retmode": "xml"}
+        resp = requests.get(url, params=params, timeout=timeout)
+        resp.raise_for_status()
+        soup_xml = BeautifulSoup(resp.text, "xml")
+        abstract_texts = soup_xml.find_all("abstracttext")
+        if not abstract_texts:
+            return None
+        parts = []
+        for node in abstract_texts:
+            parts.append(node.get_text(separator="\n").strip())
+        return "\n".join([p for p in parts if p])
+    except Exception as e:
+        logger.warning(f"PubMed fetch failed for PMID={pmid}: {e}")
+        return None
+
+def _get_abstract_crossref(doi: str, timeout: int = 20) -> Optional[str]:
+    """
+    Query Crossref works API and return the abstract (HTML cleaned) or None.
+    """
+    try:
+        url = f"https://api.crossref.org/works/{doi}"
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json().get("message", {})
+        raw = data.get("abstract")
+        if not raw:
+            return None
+        return BeautifulSoup(raw, "html.parser").get_text(separator="\n").strip()
+    except Exception as e:
+        logger.warning(f"Crossref fetch failed for DOI={doi}: {e}")
+        return None
+
+
 
 def save_pdf(
     paper_metadata: Dict[str, Any],
@@ -34,31 +75,32 @@ def save_pdf(
     save_metadata: bool = False,
     api_keys: Optional[Union[str, Dict[str, str]]] = None,
     preferred_type: str = "pdf",
-    mail: Optional[str] = None,
+    mail: Optional[str] = None
 ) -> None:
     """
-    Save a PDF (or XML) file of a paper, given its metadata.
+    Save a PDF file of a paper.
 
     Args:
         paper_metadata: A dictionary with the paper metadata. Must contain the `doi` key.
         filepath: Path to the PDF file to be saved (with or without suffix).
-        save_metadata: If True, also saves extracted metadata (title, authors, abstract) as JSON.
-        api_keys: Either a dict containing API keys, a path to an API key file, or None.
+        save_metadata: A boolean indicating whether to save paper metadata as a separate json.
+        api_keys: Either a dictionary containing API keys (if already loaded) or a string (path to API keys file).
+                  If None, will try to load from `.env` file and if unsuccessful, skip API-based fallbacks.
         preferred_type: Preferred file type to download, 'pdf' or 'xml'. Defaults to 'pdf'.
-        mail: Email address (recommended for Unpaywall API).
     """
     if not isinstance(paper_metadata, Dict):
         raise TypeError(f"paper_metadata must be a dict, not {type(paper_metadata)}.")
-    if "doi" not in paper_metadata:
+    if "doi" not in paper_metadata.keys():
         raise KeyError("paper_metadata must contain the key 'doi'.")
     if not isinstance(filepath, (str, Path)):
         raise TypeError(f"filepath must be a string or Path, not {type(filepath)}.")
 
     output_path = Path(filepath)
-    if not output_path.parent.exists():
-        raise ValueError(f"The folder: {output_path.parent} does not exist.")
 
-    # Load API keys if not already loaded
+    if not output_path.parent.exists():
+        raise ValueError(f"The folder: {output_path.parent} seems to not exist.")
+
+    # load API keys from file if not already loaded via in save_pdf_from_dump (dict)
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
 
@@ -68,96 +110,163 @@ def save_pdf(
     soup = None
     final_url = None
 
-    # === Primary attempt: resolve DOI and fetch citation_pdf_url ===
     try:
         response = requests.get(url, timeout=60)
-        final_url = response.url
         response.raise_for_status()
+        final_url = response.url
         soup = BeautifulSoup(response.text, features="lxml")
-
         meta_pdf = soup.find("meta", {"name": "citation_pdf_url"})
         if meta_pdf and meta_pdf.get("content"):
             pdf_url = meta_pdf.get("content")
             pdf_response = requests.get(pdf_url, timeout=60)
             pdf_response.raise_for_status()
 
-            if pdf_response.content.startswith(b"%PDF"):
+            if pdf_response.content[:4] == b"%PDF":
                 with open(output_path.with_suffix(".pdf"), "wb+") as f:
                     f.write(pdf_response.content)
                 success = True
             else:
-                logger.warning(f"The file from {pdf_url} is not a valid PDF.")
+                logger.warning(
+                    f"The file from {pdf_url} does not appear to be a valid PDF."
+                )
 
     except Exception as e:
-        logger.warning(f"Could not download from {final_url or url}: {e}. Trying fallbacks.")
-        final_url= final_url or url
+        logger.warning(f"Could not download from: {final_url} - {e}. Trying fallbacks.")
 
-    # === If successful, optionally save metadata ===
     if success:
-        if save_metadata and soup:
-            metadata = {}
-            # Title
-            title_tag = soup.find("meta", {"name": "citation_title"})
-            metadata["title"] = title_tag.get("content") if title_tag else "Title not found"
+        if not save_metadata:
+            return
 
-            # Authors
-            authors = [a["content"] for a in soup.find_all("meta", {"name": "citation_author"}) if a.get("content")]
-            metadata["authors"] = authors if authors else ["Author information not found"]
+        metadata = {}
+        # Extract title
+        title_tag = soup.find("meta", {"name": "citation_title"})
+        metadata["title"] = title_tag.get("content") if title_tag else "Title not found"
 
-            # Abstract
-            domain = tldextract.extract(final_url or url).domain
-            abstract_keys = ABSTRACT_ATTRIBUTE.get(domain, DEFAULT_ATTRIBUTES)
+        # Extract authors
+        authors = []
+        for author_tag in soup.find_all("meta", {"name": "citation_author"}):
+            if author_tag.get("content"):
+                authors.append(author_tag["content"])
+        metadata["authors"] = authors if authors else ["Author information not found"]
+
+        # Extract abstract
+        domain = tldextract.extract(url).domain
+        abstract_keys = ABSTRACT_ATTRIBUTE.get(domain, DEFAULT_ATTRIBUTES)
+
+        for key in abstract_keys:
+            abstract_tag = soup.find("meta", {"name": key})
+            if abstract_tag:
+                raw_abstract = BeautifulSoup(
+                    abstract_tag.get("content", "None"), "html.parser"
+                ).get_text(separator="\n")
+                if raw_abstract.strip().startswith("Abstract"):
+                    raw_abstract = raw_abstract.strip()[8:]
+                metadata["abstract"] = raw_abstract.strip()
+                break
+
+        if "abstract" not in metadata.keys():
             metadata["abstract"] = "Abstract not found"
+            logger.warning(f"Could not find abstract for {url}")
+        elif metadata["abstract"].endswith("..."):
+            logger.warning(f"Abstract truncated from {url}")
 
-            for key in abstract_keys:
-                abstract_tag = soup.find("meta", {"name": key})
-                if abstract_tag:
-                    raw_abstract = BeautifulSoup(
-                        abstract_tag.get("content", "None"), "html.parser"
-                    ).get_text(separator="\n")
-                    if raw_abstract.strip().startswith("Abstract"):
-                        raw_abstract = raw_abstract.strip()[8:]
-                    metadata["abstract"] = raw_abstract.strip()
-                    break
-
-            if metadata["abstract"].endswith("..."):
-                logger.warning(f"Abstract truncated from {url}")
-
-            # Save metadata JSON
-            try:
-                with open(output_path.with_suffix(".json"), "w", encoding="utf-8") as f:
-                    json.dump(metadata, f, ensure_ascii=False, indent=4)
-            except Exception as e:
-                logger.error(f"Failed to save metadata JSON for {doi}: {e}")
+        # Save metadata to JSON
+        try:
+            with open(output_path.with_suffix(".json"), "w", encoding="utf-8") as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            logger.error(f"Failed to save metadata to {str(output_path)}: {e}")
         return
 
-    # === Fallbacks: Publisher-aware routing ===
+    # If primary download failed, try fallbacks
     logger.info(f"Primary download failed for {doi}. Attempting fallbacks.")
-    domain = tldextract.extract(final_url).domain.lower() if (final_url) else ""
-    logger.info(f"Resolved domain for DOI {doi}: '{domain}' (from {final_url})")
 
-    # Publisher-specific fallbacks first
-    if "plos" in domain:
-        if FALLBACKS["plos"](doi, output_path): return
-    elif "elife" in domain:
-        if FALLBACKS["elife"](doi, output_path): return
-    elif "biorxiv" in domain:
-        if api_keys.get("AWS_ACCESS_KEY_ID") and api_keys.get("AWS_SECRET_ACCESS_KEY"):
-            if FALLBACKS["s3"](doi, output_path, api_keys): return
-    elif "wiley" in domain and api_keys.get("WILEY_TDM_API_TOKEN"):
-        if FALLBACKS["wiley"](paper_metadata, output_path, api_keys): return
-    elif "elsevier" in domain and api_keys.get("ELSEVIER_TDM_API_KEY"):
-        if FALLBACKS["elsevier"](paper_metadata, output_path, api_keys,
-                                preferred_type=preferred_type): return
 
-    # General-purpose open access fallbacks
-    if mail and FALLBACKS["unpaywall"](doi, output_path, mail, final_url): return
-    if FALLBACKS["europepmc"](doi, output_path): return
-    if FALLBACKS["bioc_pmc"](doi, output_path, mail): return
+    if mail and FALLBACKS["unpaywall"](doi, output_path,mail,final_url):
+        return
+
+    if FALLBACKS["europepmc"](doi, output_path):
+        return
+
+    if FALLBACKS["bioc_pmc"](doi, output_path,mail):
+        return
+
+    if (
+        "biorxiv" in doi.lower()
+        and api_keys.get("AWS_ACCESS_KEY_ID")
+        and api_keys.get("AWS_SECRET_ACCESS_KEY")
+    ):
+        if FALLBACKS["s3"](doi, output_path, api_keys):
+            return
+
+    if "plos" in doi.lower():
+        if FALLBACKS["plos"](doi, output_path):
+            return
+
+    if "elife" in doi.lower():
+        if FALLBACKS["elife"](doi, output_path):
+            return
+
+    if api_keys:
+        if "wiley" in doi.lower() and api_keys.get("WILEY_TDM_API_TOKEN"):
+            if FALLBACKS["wiley"](
+                paper_metadata, output_path, api_keys
+            ):
+                return
+        if api_keys.get("ELSEVIER_TDM_API_KEY"):
+            if FALLBACKS["elsevier"](
+                paper_metadata, output_path, api_keys, preferred_type=preferred_type
+            ):
+                return
+
 
     logger.warning(f"All download attempts failed for {doi}.")
+    # --- Replace the previous "save abstract as .txt when all attempts failed" block with this ---
+    abstract_text = None
 
+    # 1) Prefer explicit abstract in the metadata dump
+    if isinstance(paper_metadata, dict) and paper_metadata.get("abstract"):
+        abstract_text = paper_metadata.get("abstract").strip()
 
+    # 2) If no abstract yet and pmid present, try PubMed Entrez
+    if not abstract_text and isinstance(paper_metadata, dict) and paper_metadata.get("pubmed_id"):
+        pmid = str(paper_metadata.get("pubmed_id"))
+        abstract_text = _get_abstract_pubmed(pmid)
+
+    # 3) If still no abstract, try Crossref for the DOI
+    if not abstract_text:
+        try:
+            abstract_text = _get_abstract_crossref(doi)
+        except Exception:
+            # helper already logs; keep going to try soup extraction
+            abstract_text = None
+
+    # 4) Try extracting from previously fetched soup (DOI landing page)
+    if not abstract_text and soup:
+        domain = tldextract.extract(url).domain
+        abstract_keys = ABSTRACT_ATTRIBUTE.get(domain, DEFAULT_ATTRIBUTES)
+        for key in abstract_keys:
+            abstract_tag = soup.find("meta", {"name": key})
+            if abstract_tag and abstract_tag.get("content"):
+                raw_abstract = BeautifulSoup(
+                    abstract_tag.get("content", "None"), "html.parser"
+                ).get_text(separator="\n")
+                if raw_abstract.strip().startswith("Abstract"):
+                    raw_abstract = raw_abstract.strip()[8:]
+                abstract_text = raw_abstract.strip()
+                break
+
+    if not abstract_text:
+        abstract_text = "Abstract not found"
+
+    try:
+        txt_path = output_path.with_suffix(".txt")
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write(abstract_text)
+        logger.info(f"Saved abstract to {txt_path}")
+    except Exception as e:
+        logger.error(f"Failed to save abstract to {output_path.with_suffix('.txt')}: {e}")
+    return
 
 def save_pdf_from_dump(
     dump_path: str,

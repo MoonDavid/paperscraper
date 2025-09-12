@@ -111,7 +111,9 @@ def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@exampl
         bool: True if the XML file was successfully downloaded, False otherwise.
     """
     ncbi_tool = "paperscraper"
-
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
     converter_url = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
     params = {
         "tool": ncbi_tool,
@@ -121,7 +123,7 @@ def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@exampl
         "format": "json",
     }
     try:
-        conv_response = requests.get(converter_url, params=params, timeout=60)
+        conv_response = requests.get(converter_url, params=params, headers=headers, timeout=60)
         conv_response.raise_for_status()
         data = conv_response.json()
         records = data.get("records", [])
