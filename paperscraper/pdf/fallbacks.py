@@ -728,6 +728,235 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
         logger.error(f"Failed to download XML from Europe PMC for DOI {doi}: {xml_err}")
         return False
 
+from urllib.parse import quote
+
+def fallback_openalex(doi: str, output_path: Path) -> bool:
+    """
+    Use OpenAlex to locate an OA PDF for a DOI.
+    https://api.openalex.org/works/doi:{doi}
+    """
+    try:
+        url = f"https://api.openalex.org/works/doi:{quote(doi)}"
+        r = requests.get(url, timeout=60)
+        if r.status_code == 404:
+            logger.info(f"OpenAlex: no record for {doi}")
+            return False
+        r.raise_for_status()
+        data = r.json()
+
+        best = data.get("best_oa_location") or {}
+        pdf_url = best.get("pdf_url")
+        if not pdf_url:
+            # Fallbacks: try other locations OpenAlex exposes
+            primary = data.get("primary_location") or {}
+            pdf_url = primary.get("pdf_url") or (best.get("landing_page_url") if best.get("is_oa") else None)
+
+        if not pdf_url:
+            logger.info(f"OpenAlex: no OA PDF for {doi}")
+            return False
+
+        pdf = requests.get(pdf_url, timeout=60)
+        pdf.raise_for_status()
+        if not pdf.content.startswith(b"%PDF"):
+            logger.warning(f"OpenAlex PDF URL did not return a PDF for {doi}")
+            return False
+
+        with open(output_path.with_suffix(".pdf"), "wb") as f:
+            f.write(pdf.content)
+        logger.info(f"Successfully downloaded PDF via OpenAlex for {doi}.")
+        return True
+    except Exception as e:
+        logger.error(f"OpenAlex fallback failed for {doi}: {e}")
+        return False
+
+
+def fallback_crossref_links(doi: str, output_path: Path, contact_email: str = "your_email@example.com") -> bool:
+    """
+    Use Crossref /works to find publisher-provided text-mining PDF links.
+    Prefers links with intended-application='text-mining' and content-type='application/pdf'.
+    """
+    try:
+        url = f"https://api.crossref.org/works/{quote(doi)}"
+        headers = {"User-Agent": f"paperscraper (mailto:{contact_email})"}
+        r = requests.get(url, headers=headers, timeout=60)
+        r.raise_for_status()
+        msg = r.json().get("message", {})
+        links = msg.get("link", []) or []
+
+        # Prioritize text-mining PDF links, then any PDF links
+        def score(link: dict) -> tuple:
+            return (
+                0 if link.get("intended-application") == "text-mining" else 1,
+                0 if link.get("content-type") == "application/pdf" else 1,
+            )
+
+        links = sorted(links, key=score)
+        for link in links:
+            if link.get("content-type") != "application/pdf":
+                continue
+            pdf_url = link.get("URL")
+            if not pdf_url:
+                continue
+            try:
+                pdf = requests.get(pdf_url, headers=headers, timeout=60)
+                pdf.raise_for_status()
+                if pdf.content.startswith(b"%PDF"):
+                    with open(output_path.with_suffix(".pdf"), "wb") as f:
+                        f.write(pdf.content)
+                    logger.info(f"Successfully downloaded PDF via Crossref link for {doi}.")
+                    return True
+            except Exception as sub_e:
+                logger.info(f"Crossref link failed for {doi}: {sub_e}")
+        logger.info(f"Crossref: no usable PDF links for {doi}.")
+        return False
+    except Exception as e:
+        logger.error(f"Crossref fallback failed for {doi}: {e}")
+        return False
+
+
+def fallback_arxiv(doi: str, output_path: Path) -> bool:
+    """
+    If an arXiv preprint is associated with the DOI, fetch the arXiv PDF.
+    """
+    try:
+        # arXiv Atom API supports DOI query
+        q = quote(f'doi:"{doi}"')
+        url = f"http://export.arxiv.org/api/query?search_query={q}&max_results=1"
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+        root = etree.fromstring(r.content)
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        entry_id = root.find(".//a:entry/a:id", namespaces=ns)
+        if entry_id is None or not entry_id.text:
+            logger.info(f"arXiv: no entry for DOI {doi}")
+            return False
+        abs_url = entry_id.text.strip()
+        if "/abs/" not in abs_url:
+            logger.info(f"arXiv: unexpected entry URL for {doi}: {abs_url}")
+            return False
+        pdf_url = abs_url.replace("/abs/", "/pdf/") + ".pdf"
+        pdf = requests.get(pdf_url, timeout=60)
+        pdf.raise_for_status()
+        if not pdf.content.startswith(b"%PDF"):
+            logger.warning(f"arXiv URL did not return a PDF for {doi}")
+            return False
+        with open(output_path.with_suffix(".pdf"), "wb") as f:
+            f.write(pdf.content)
+        logger.info(f"Successfully downloaded PDF via arXiv for {doi}.")
+        return True
+    except Exception as e:
+        logger.error(f"arXiv fallback failed for {doi}: {e}")
+        return False
+
+
+def month_folder_medrxiv(doi: str) -> str:
+    """
+    Get medRxiv posting month folder, rolling over last-day postings to next month.
+    """
+    url = f"https://api.medrxiv.org/details/medrxiv/{doi}/na/json"
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    date_str = resp.json()["collection"][0]["date"]
+    date = datetime.date.fromisoformat(date_str)
+    last_day = calendar.monthrange(date.year, date.month)[1]
+    if date.day == last_day:
+        date = date + datetime.timedelta(days=1)
+    return date.strftime("%B_%Y")
+
+
+def fallback_medrxiv_s3(
+    doi: str, output_path: Union[str, Path], api_keys: dict, workers: int = 32
+) -> bool:
+    """
+    Download a medRxiv PDF via the requester-pays S3 bucket using range requests.
+    """
+    s3 = boto3.client(
+        "s3",
+        aws_access_key_id=api_keys.get("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=api_keys.get("AWS_SECRET_ACCESS_KEY"),
+        region_name="us-east-1",
+    )
+    bucket = "medrxiv-src-monthly"
+    try:
+        prefix = f"Current_Content/{month_folder_medrxiv(doi)}/"
+    except Exception as e:
+        logger.error(f"Could not resolve medRxiv month folder for {doi}: {e}")
+        return False
+
+    meca_keys = list_meca_keys(s3, bucket, prefix)
+    if not meca_keys:
+        logger.info(f"No MECA archives in {bucket}/{prefix} for {doi}")
+        return False
+
+    token = doi.split("/")[-1].lower()
+    executor = ThreadPoolExecutor(max_workers=workers)
+    futures = {executor.submit(find_meca_for_doi, s3, bucket, key, token): key for key in meca_keys}
+    pbar = tqdm(total=len(futures), desc=f"Scanning in medrxiv with {workers} workers for {doi}…")
+    target = None
+    for fut in as_completed(futures):
+        key = futures[fut]
+        try:
+            if fut.result():
+                target = key
+                pbar.set_description(f"Success! Found target {doi} in {key}")
+                for other in futures:
+                    other.cancel()
+                break
+        except Exception:
+            pass
+        finally:
+            pbar.update(1)
+    executor.shutdown(wait=False)
+    if target is None:
+        logger.error(f"Could not find {doi} on medrxiv")
+        return False
+
+    data = s3.get_object(Bucket=bucket, Key=target, RequestPayer="requester")["Body"].read()
+    output_path = Path(output_path)
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        for name in z.namelist():
+            if name.lower().endswith(".pdf"):
+                z.extract(name, path=output_path.parent)
+                (output_path.parent / name).rename(output_path.with_suffix(".pdf"))
+                return True
+    return False
+
+
+def fallback_doaj(doi: str, output_path: Path) -> bool:
+    """
+    Use DOAJ API to find fulltext links for OA articles.
+    """
+    try:
+        url = f"https://doaj.org/api/v2/search/articles/doi:{quote(doi)}"
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+        results = r.json().get("results", []) or []
+        for res in results:
+            links = (res.get("bibjson", {}) or {}).get("link", []) or []
+            for ln in links:
+                if ln.get("type") != "fulltext":
+                    continue
+                pdf_url = ln.get("url")
+                if not pdf_url:
+                    continue
+                try:
+                    pdf = requests.get(pdf_url, timeout=60)
+                    pdf.raise_for_status()
+                    if not pdf.content.startswith(b"%PDF"):
+                        continue
+                    with open(output_path.with_suffix(".pdf"), "wb") as f:
+                        f.write(pdf.content)
+                    logger.info(f"Successfully downloaded PDF via DOAJ for {doi}.")
+                    return True
+                except Exception:
+                    continue
+        logger.info(f"DOAJ: no usable fulltext PDF for {doi}.")
+        return False
+    except Exception as e:
+        logger.error(f"DOAJ fallback failed for {doi}: {e}")
+        return False
+
+
 
 FALLBACKS: Dict[str, Callable] = {
     "bioc_pmc": fallback_bioc_pmc,
@@ -739,4 +968,9 @@ FALLBACKS: Dict[str, Callable] = {
     "unpaywall": fallback_unpaywall,
     "springer": fallback_springer_api,
     "plos": fallback_plos_api,
+    "openalex": fallback_openalex,
+    "crossref": fallback_crossref_links,
+    "arxiv": fallback_arxiv,
+    "medrxiv_s3": fallback_medrxiv_s3,
+    "doaj": fallback_doaj,
 }
