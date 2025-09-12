@@ -302,9 +302,6 @@ def save_pdf_from_dump(
 
     if not isinstance(key_to_save, str):
         raise TypeError(f"key_to_save must be a string, not {type(key_to_save)}.")
-    if key_to_save not in ["doi", "title", "date"]:
-        raise ValueError("key_to_save must be one of 'doi' or 'title'.")
-
     if preferred_type not in ["pdf", "xml"]:
         raise ValueError("preferred_type must be one of 'pdf' or 'xml'.")
 
