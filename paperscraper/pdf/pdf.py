@@ -240,7 +240,7 @@ def save_pdf(
             return
 
     if api_keys:
-        if "wiley" in doi.lower() and api_keys.get("WILEY_TDM_API_TOKEN"):
+        if api_keys.get("WILEY_TDM_API_TOKEN"):
             if FALLBACKS["wiley"](
                 paper_metadata, output_path, api_keys
             ):
