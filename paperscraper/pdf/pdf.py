@@ -67,6 +67,38 @@ def _get_abstract_crossref(doi: str, timeout: int = 20) -> Optional[str]:
         logger.warning(f"Crossref fetch failed for DOI={doi}: {e}")
         return None
 
+# python
+def _get_abstract_europepmc(doi: str, timeout: int = 20) -> Optional[str]:
+    """
+    Query Europe PMC REST API for DOI and return the abstract (prefer `abstractText`) or None.
+    Uses resultType=core&format=json as requested.
+    """
+    try:
+        url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+        params = {"query": f"DOI:{doi}", "resultType": "core", "format": "json"}
+        resp = requests.get(url, params=params, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        results = data.get("resultList", {}).get("result", [])
+        if not results:
+            return None
+        first = results[0]
+        # Try keys likely returned: 'abstractText', 'abstract' (case-insensitive fallback)
+        abstract = first.get("abstractText") or first.get("abstract")
+        if not abstract:
+            # case-insensitive fallback
+            for k, v in first.items():
+                if k.lower() == "abstracttext" or k.lower() == "abstract":
+                    abstract = v
+                    break
+        if not abstract:
+            return None
+        return BeautifulSoup(abstract, "html.parser").get_text(separator="\n").strip()
+    except Exception as e:
+        logger.warning(f"EuropePMC fetch failed for DOI={doi}: {e}")
+        return None
+
+# --- Replace abstract retrieval section in save_pdf with the following block ---
 
 
 def save_pdf(
@@ -224,6 +256,11 @@ def save_pdf(
     # --- Replace the previous "save abstract as .txt when all attempts failed" block with this ---
     abstract_text = None
 
+    # 1) Try Europe PMC first (prefer AbstractText)
+    try:
+        abstract_text = _get_abstract_europepmc(doi)
+    except Exception:
+        abstract_text = None
 
     # 2) If no abstract yet and pmid present, try PubMed Entrez
     if not abstract_text and isinstance(paper_metadata, dict) and paper_metadata.get("pubmed_id"):
@@ -235,34 +272,17 @@ def save_pdf(
         try:
             abstract_text = _get_abstract_crossref(doi)
         except Exception:
-            # helper already logs; keep going to try soup extraction
             abstract_text = None
 
-    # 4) Try extracting from previously fetched soup (DOI landing page)
-    if not abstract_text and soup:
-        domain = tldextract.extract(url).domain
-        abstract_keys = ABSTRACT_ATTRIBUTE.get(domain, DEFAULT_ATTRIBUTES)
-        for key in abstract_keys:
-            abstract_tag = soup.find("meta", {"name": key})
-            if abstract_tag and abstract_tag.get("content"):
-                raw_abstract = BeautifulSoup(
-                    abstract_tag.get("content", "None"), "html.parser"
-                ).get_text(separator="\n")
-                if raw_abstract.strip().startswith("Abstract"):
-                    raw_abstract = raw_abstract.strip()[8:]
-                abstract_text = raw_abstract.strip()
-                break
-
     if not abstract_text:
-        abstract_text = "Abstract not found"
-
-    try:
-        txt_path = output_path.with_suffix(".txt")
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write(abstract_text)
-        logger.info(f"Saved abstract to {txt_path}")
-    except Exception as e:
-        logger.error(f"Failed to save abstract to {output_path.with_suffix('.txt')}: {e}")
+        logger.warning(f"Could not retrieve abstract for {doi}.")
+    else:
+        try:
+            with open(output_path.with_suffix(".txt"), "w", encoding="utf-8") as f:
+                f.write(abstract_text)
+            logger.info(f"Saved abstract to {str(output_path.with_suffix('.txt'))}.")
+        except Exception as e:
+            logger.error(f"Failed to save abstract to {str(output_path)}: {e}")
     return
 
 def save_pdf_from_dump(
