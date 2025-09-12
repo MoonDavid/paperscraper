@@ -11,18 +11,85 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable, Dict, Union
+import threading
+from collections import deque
 
 import boto3
 import requests
 from lxml import etree
 from tqdm import tqdm
-from bs4 import BeautifulSoup
 
 ELIFE_XML_INDEX = None  # global variable to cache the eLife XML index from GitHub
 
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class WileyRateLimiter:
+    """
+    Smart rate limiter for Wiley API that handles both:
+    - 3 articles per second
+    - 60 requests per 10 minutes
+
+    Uses a token bucket approach for efficient rate limiting.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        # Token bucket for per-second limit (3 tokens, refill 3 per second)
+        self._per_second_tokens = 3.0
+        self._per_second_capacity = 3.0
+        self._per_second_refill_rate = 3.0  # tokens per second
+        self._last_refill = time.time()
+
+        # Sliding window for 10-minute limit (60 requests per 600 seconds)
+        self._request_times = deque()
+        self._ten_minute_limit = 60
+        self._ten_minute_window = 600  # seconds
+
+    def acquire(self) -> float:
+        """
+        Acquire permission to make a request.
+        Returns the time to wait before making the request (0 if immediate).
+        """
+        with self._lock:
+            now = time.time()
+
+            # Refill per-second tokens based on elapsed time
+            elapsed = now - self._last_refill
+            self._per_second_tokens = min(
+                self._per_second_capacity,
+                self._per_second_tokens + elapsed * self._per_second_refill_rate
+            )
+            self._last_refill = now
+
+            # Clean old requests from 10-minute window
+            cutoff = now - self._ten_minute_window
+            while self._request_times and self._request_times[0] < cutoff:
+                self._request_times.popleft()
+
+            # Check 10-minute limit
+            if len(self._request_times) >= self._ten_minute_limit:
+                # Calculate how long to wait for oldest request to expire
+                wait_time = self._request_times[0] + self._ten_minute_window - now
+                return max(0, wait_time)
+
+            # Check per-second limit
+            if self._per_second_tokens < 1.0:
+                # Calculate how long to wait for next token
+                wait_time = (1.0 - self._per_second_tokens) / self._per_second_refill_rate
+                return wait_time
+
+            # Consume tokens and record request
+            self._per_second_tokens -= 1.0
+            self._request_times.append(now)
+
+            return 0.0
+
+
+# Global rate limiter instance
+_wiley_rate_limiter = WileyRateLimiter()
 
 
 def fallback_wiley_api(
@@ -32,11 +99,13 @@ def fallback_wiley_api(
     max_attempts: int = 2,
 ) -> bool:
     """
-    Attempt to download the PDF via the Wiley TDM API (popular publisher which blocks standard scraping attempts; API access free for academic users).
+    Attempt to download the PDF via the Wiley TDM API with smart rate limiting.
 
-    This function uses the WILEY_TDM_API_TOKEN environment variable to authenticate
-    with the Wiley TDM API and attempts to download the PDF for the given paper.
-    See https://onlinelibrary.wiley.com/library-info/resources/text-and-datamining for a description on how to get your WILEY_TDM_API_TOKEN.
+    Implements proper rate limiting for:
+    - up to 3 articles per second
+    - up to 60 requests per 10 minutes
+
+    Uses token bucket algorithm for efficient handling of rate limits.
 
     Args:
         paper_metadata (dict): Dictionary containing paper metadata. Must include the 'doi' key.
@@ -49,6 +118,10 @@ def fallback_wiley_api(
     """
 
     WILEY_TDM_API_TOKEN = api_keys.get("WILEY_TDM_API_TOKEN")
+    if not WILEY_TDM_API_TOKEN:
+        logger.info("No Wiley API token found, skipping Wiley fallback.")
+        return False
+
     encoded_doi = paper_metadata["doi"].replace("/", "%2F")
     api_url = f"https://api.wiley.com/onlinelibrary/tdm/v1/articles/{encoded_doi}"
     headers = {"Wiley-TDM-Client-Token": WILEY_TDM_API_TOKEN}
@@ -58,13 +131,20 @@ def fallback_wiley_api(
 
     while attempt < max_attempts:
         try:
+            # Smart rate limiting - wait if necessary
+            wait_time = _wiley_rate_limiter.acquire()
+            if wait_time > 0:
+                logger.info(f"Wiley API rate limit: waiting {wait_time:.1f} seconds...")
+                time.sleep(wait_time)
+
             api_response = requests.get(
                 api_url, headers=headers, allow_redirects=True, timeout=60
             )
             api_response.raise_for_status()
+
             if api_response.content[:4] != b"%PDF":
                 logger.warning(
-                    f"API returned content that is not a valid PDF for {paper_metadata['doi']}."
+                    f"Wiley API returned content that is not a valid PDF for {paper_metadata['doi']}."
                 )
             else:
                 with open(output_path.with_suffix(".pdf"), "wb+") as f:
@@ -74,21 +154,24 @@ def fallback_wiley_api(
                 )
                 success = True
                 break
-        except Exception as e2:
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:  # Rate limit exceeded
+                # If we hit rate limit despite our limiter, wait longer
+                retry_after = int(e.response.headers.get('Retry-After', 30))
+                logger.warning(f"Wiley API rate limit hit, waiting {retry_after} seconds...")
+                time.sleep(retry_after)
+            else:
+                logger.error(f"Wiley API HTTP error (attempt {attempt + 1}/{max_attempts}): {e}")
+                if attempt < max_attempts - 1:
+                    time.sleep(5)  # Brief pause before retry
+        except Exception as e:
+            logger.error(f"Wiley API error (attempt {attempt + 1}/{max_attempts}): {e}")
             if attempt < max_attempts - 1:
-                logger.info("Waiting 20 seconds before retrying...")
-                time.sleep(20)
-            logger.error(
-                f"Could not download via Wiley API (attempt {attempt + 1}/{max_attempts}): {e2}"
-            )
+                time.sleep(5)  # Brief pause before retry
 
         attempt += 1
 
-    # **Mandatory delay of 10 seconds to comply with Wiley API rate limits**
-    logger.info(
-        "Waiting 10 seconds before next request to comply with Wiley API rate limits..."
-    )
-    time.sleep(10)
     return success
 
 
