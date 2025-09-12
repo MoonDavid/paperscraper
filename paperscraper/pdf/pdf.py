@@ -224,9 +224,6 @@ def save_pdf(
     # --- Replace the previous "save abstract as .txt when all attempts failed" block with this ---
     abstract_text = None
 
-    # 1) Prefer explicit abstract in the metadata dump
-    if isinstance(paper_metadata, dict) and paper_metadata.get("abstract"):
-        abstract_text = paper_metadata.get("abstract").strip()
 
     # 2) If no abstract yet and pmid present, try PubMed Entrez
     if not abstract_text and isinstance(paper_metadata, dict) and paper_metadata.get("pubmed_id"):
@@ -315,7 +312,7 @@ def save_pdf_from_dump(
         pbar.set_description(f"Processing paper {i + 1}/{len(papers)}")
 
         if "doi" not in paper.keys() or paper["doi"] is None:
-            logger.warning(f"Skipping {paper['title']} since no DOI available.")
+            logger.warning(f"Skipping paper since no DOI available.")
             continue
         filename = paper[key_to_save].replace("/", "_")
         pdf_file = Path(os.path.join(pdf_path, f"{filename}.pdf"))
