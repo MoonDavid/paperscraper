@@ -426,6 +426,64 @@ def save_pdf_from_dump(
 
 
 # Debug variants: try all fallbacks independently of order and record which work
+# New helpers (place near other helper functions in `paperscraper/pdf/pdf.py`)
+def _get_redirect_domain(doi: str, timeout: int = 10) -> Optional[str]:
+    """
+    Resolve https://doi.org/{doi} and return the extracted domain (e.g. 'wiley') or None on failure.
+    """
+    try:
+        resp = requests.get(f"https://doi.org/{doi}", timeout=timeout, allow_redirects=True)
+        resp.raise_for_status()
+        return tldextract.extract(resp.url).domain or None
+    except Exception:
+        return None
+
+
+def _crossref_publisher_is_wiley(doi: str, timeout: int = 10) -> bool:
+    """
+    Query Crossref works API and return True if publisher name contains 'wiley' (case-insensitive).
+    """
+    try:
+        url = f"https://api.crossref.org/works/{doi}"
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        publisher = resp.json().get("message", {}).get("publisher", "") or ""
+        return "wiley" in publisher.lower()
+    except Exception:
+        return False
+
+
+def _wiley_allowed(doi: str, final_url: Optional[str] = None, timeout: int = 10) -> bool:
+    """
+    Return True if it's reasonable to attempt the Wiley TDM fallback:
+    - either the DOI redirect domain contains 'wiley', or
+    - the Crossref publisher is Wiley.
+    """
+    # 1) check provided final_url if available
+    try:
+        if final_url:
+            domain = tldextract.extract(final_url).domain or ""
+            if "wiley" in domain.lower():
+                return True
+    except Exception:
+        pass
+
+    # 2) try resolving DOI redirect domain
+    try:
+        redirect_domain = _get_redirect_domain(doi, timeout=timeout)
+        if redirect_domain and "wiley" in redirect_domain.lower():
+            return True
+    except Exception:
+        pass
+
+    # 3) fallback to Crossref publisher check
+    try:
+        if _crossref_publisher_is_wiley(doi, timeout=timeout):
+            return True
+    except Exception:
+        pass
+
+    return False
 
 def debug_save_pdf(
     paper_metadata: Dict[str, Any],
@@ -449,19 +507,23 @@ def debug_save_pdf(
     successes = []
     per = {}
 
-    # Try direct
-    direct_path = str(base_output)
+    # Use a unique path for the initial direct check so save_pdf doesn't
+    # already save a fallback to the main output and interfere with later attempts.
+    direct_check_path = Path(str(base_output) + ".direct_check")
     direct_res = save_pdf(
         paper_metadata,
-        direct_path,
+        direct_check_path,
         save_metadata=False,
         api_keys=api_keys,
         preferred_type=preferred_type,
         mail=mail,
     )
-    if direct_res.get("success"):
+
+    # Only treat "direct" as successful if the returned method is actually "direct"
+    is_direct = bool(direct_res.get("success") and direct_res.get("method") == "direct")
+    if is_direct:
         successes.append("direct")
-    per["direct"] = bool(direct_res.get("success"))
+    per["direct"] = is_direct
     first_saved = "direct" if per["direct"] else None
 
     # Build a deterministic list of fallbacks
@@ -469,8 +531,6 @@ def debug_save_pdf(
         "unpaywall",
         "europepmc",
         "bioc_pmc",
-        "s3",
-        "medrxiv_s3",
         "plos",
         "elife",
         "openalex",
@@ -499,8 +559,15 @@ def debug_save_pdf(
             if name in ("plos", "elife"):
                 return FALLBACKS[name](doi, out)
             if name in ("wiley", "springer"):
-                if name == "wiley" and not api_keys.get("WILEY_TDM_API_TOKEN"):
-                    return False
+                if name == "wiley":
+                    if not api_keys.get("WILEY_TDM_API_TOKEN"):
+                        return False
+                    # Only try Wiley when applicable
+                    try:
+                        if not _wiley_allowed(doi):
+                            return False
+                    except Exception:
+                        return False
                 if name == "springer" and not api_keys.get("SPRINGER_API_KEY"):
                     return False
                 return FALLBACKS[name](paper_metadata, out, api_keys)
@@ -527,8 +594,7 @@ def debug_save_pdf(
                 break
 
     return {"direct": per.get("direct", False), "results": per, "successes": successes, "first_saved": first_saved}
-
-
+# python
 def debug_save_pdf_from_dump(
     dump_path: str,
     pdf_path: str,
@@ -536,10 +602,12 @@ def debug_save_pdf_from_dump(
     preferred_type: str = "pdf",
     mail: Optional[str] = None,
     save_first_only: bool = True,
+    save_interval: int = 10,
 ) -> Dict[str, Any]:
     """
     Debug variant for batch processing that tests all fallbacks per paper and records which work.
     Writes a debug_fallback_stats.json with detailed per-DOI outcomes.
+    Saves intermediate stats every `save_interval` papers so partial results are available.
     """
     papers = load_jsonl(dump_path)
     if not isinstance(api_keys, dict):
@@ -549,6 +617,17 @@ def debug_save_pdf_from_dump(
     counts: Dict[str, int] = {}
 
     pbar = tqdm(papers, total=len(papers), desc="Debug processing")
+    def _write_debug_stats(target_dir: str, by_doi_obj: Dict[str, Any], counts_obj: Dict[str, int]):
+        try:
+            stats_path = Path(target_dir) / "debug_fallback_stats.json"
+            tmp_path = stats_path.with_suffix(".tmp")
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump({"by_doi": by_doi_obj, "counts": counts_obj}, f, ensure_ascii=False, indent=2)
+            tmp_path.replace(stats_path)
+            logger.info(f"Saved debug fallback stats to {stats_path}")
+        except Exception as e:
+            logger.error(f"Failed to write debug fallback stats: {e}")
+
     for i, paper in enumerate(pbar):
         if "doi" not in paper or not paper["doi"]:
             continue
@@ -568,12 +647,14 @@ def debug_save_pdf_from_dump(
             if ok:
                 counts[fb] = counts.get(fb, 0) + 1
 
-    # write debug stats
+        # periodically save partial stats so you can inspect mid-run
+        if save_interval > 0 and ((i + 1) % save_interval == 0):
+            _write_debug_stats(pdf_path, by_doi, counts)
+
+    # write final debug stats
     try:
-        stats_path = Path(pdf_path) / "debug_fallback_stats.json"
-        with open(stats_path, "w", encoding="utf-8") as f:
-            json.dump({"by_doi": by_doi, "counts": counts}, f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved debug fallback stats to {stats_path}")
+        _write_debug_stats(pdf_path, by_doi, counts)
     except Exception as e:
-        logger.error(f"Failed to write debug fallback stats: {e}")
+        logger.error(f"Failed to write final debug fallback stats: {e}")
     return {"by_doi": by_doi, "counts": counts}
+
