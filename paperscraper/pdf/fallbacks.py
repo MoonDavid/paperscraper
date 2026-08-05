@@ -9,23 +9,28 @@ import sys
 import threading
 import time
 import zipfile
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from collections import deque
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from pathlib import Path
 from typing import Any, Callable, Dict, Union
-import threading
-from collections import deque
+from urllib.parse import quote
 
 import boto3
 import requests
 from botocore.client import BaseClient
 from botocore.config import Config
 from lxml import etree
+from tqdm import tqdm
 
 ELIFE_XML_INDEX = None  # global variable to cache the eLife XML index from GitHub
 
 logging.getLogger("urllib3.connectionpool").setLevel(logging.ERROR)
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class NCBIRateLimitError(RuntimeError):
+    """Raised when NCBI returns a rate-limit response."""
 
 
 class WileyRateLimiter:
@@ -62,7 +67,7 @@ class WileyRateLimiter:
             elapsed = now - self._last_refill
             self._per_second_tokens = min(
                 self._per_second_capacity,
-                self._per_second_tokens + elapsed * self._per_second_refill_rate
+                self._per_second_tokens + elapsed * self._per_second_refill_rate,
             )
             self._last_refill = now
 
@@ -80,7 +85,9 @@ class WileyRateLimiter:
             # Check per-second limit
             if self._per_second_tokens < 1.0:
                 # Calculate how long to wait for next token
-                wait_time = (1.0 - self._per_second_tokens) / self._per_second_refill_rate
+                wait_time = (
+                    1.0 - self._per_second_tokens
+                ) / self._per_second_refill_rate
                 return wait_time
 
             # Consume tokens and record request
@@ -160,11 +167,15 @@ def fallback_wiley_api(
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 429:  # Rate limit exceeded
                 # If we hit rate limit despite our limiter, wait longer
-                retry_after = int(e.response.headers.get('Retry-After', 30))
-                logger.warning(f"Wiley API rate limit hit, waiting {retry_after} seconds...")
+                retry_after = int(e.response.headers.get("Retry-After", 30))
+                logger.warning(
+                    f"Wiley API rate limit hit, waiting {retry_after} seconds..."
+                )
                 time.sleep(retry_after)
             else:
-                logger.error(f"Wiley API HTTP error (attempt {attempt + 1}/{max_attempts}): {e}")
+                logger.error(
+                    f"Wiley API HTTP error (attempt {attempt + 1}/{max_attempts}): {e}"
+                )
                 if attempt < max_attempts - 1:
                     time.sleep(5)  # Brief pause before retry
         except Exception as e:
@@ -177,7 +188,13 @@ def fallback_wiley_api(
     return success
 
 
-def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@example.com") -> bool:
+def fallback_bioc_pmc(
+    doi: str,
+    output_path: Path,
+    ncbi_email: str = "your_email@example.com",
+    max_attempts: int = 3,
+    retry_sleep: int = 10,
+) -> bool:
     """
     Attempt to download the XML via the BioC-PMC fallback.
 
@@ -191,6 +208,7 @@ def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@exampl
     Args:
         doi (str): The DOI of the paper to retrieve.
         output_path (Path): A pathlib.Path object representing the path where the XML file will be saved.
+        ncbi_email (str): Contact email for NCBI API requests.
         max_attempts (int): Maximum number of attempts for rate-limited API calls.
         retry_sleep (int): Base sleep duration between retry attempts.
 
@@ -198,6 +216,7 @@ def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@exampl
         bool: True if the XML file was successfully downloaded, False otherwise.
     """
     ncbi_tool = "paperscraper"
+    ncbi_email = ncbi_email or "your_email@example.com"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
@@ -209,26 +228,49 @@ def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@exampl
         "idtype": "doi",
         "format": "json",
     }
-    try:
-        conv_response = requests.get(converter_url, params=params, headers=headers, timeout=60)
-        conv_response.raise_for_status()
-        data = conv_response.json()
-        records = data.get("records", [])
-        if not records or "pmcid" not in records[0]:
-            logger.warning(
-                f"No PMCID available for DOI {doi}. Fallback via PMC therefore not possible."
+    pmcid = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            conv_response = requests.get(
+                converter_url, params=params, headers=headers, timeout=60
+            )
+            if conv_response.status_code == 429:
+                raise NCBIRateLimitError(
+                    f"NCBI rate-limited DOI to PMCID conversion for {doi}"
+                )
+            conv_response.raise_for_status()
+            data = conv_response.json()
+            records = data.get("records", [])
+            if not records or "pmcid" not in records[0]:
+                logger.warning(
+                    f"No PMCID available for DOI {doi}. Fallback via PMC therefore not possible."
+                )
+                return False
+            pmcid = records[0]["pmcid"]
+            logger.info(f"Converted DOI {doi} to PMCID {pmcid}.")
+            break
+        except NCBIRateLimitError as conv_err:
+            if attempt == max_attempts:
+                logger.error(f"Error during DOI to PMCID conversion: {conv_err}")
+                return False
+            logger.info(
+                f"NCBI rate limit hit during DOI to PMCID conversion "
+                f"(attempt {attempt}/{max_attempts}); retrying"
             )
             time.sleep(retry_sleep * attempt)
         except Exception as conv_err:
             logger.error(f"Error during DOI to PMCID conversion: {conv_err}")
             return False
 
+    if not pmcid:
+        return False
+
     # Construct PMC XML URL
     xml_url = f"https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_xml/{pmcid}/unicode"
     logger.info(f"Attempting to download XML from BioC-PMC URL: {xml_url}")
     for attempt in range(1, max_attempts + 1):
         try:
-            xml_response = requests.get(xml_url, timeout=60)
+            xml_response = requests.get(xml_url, headers=headers, timeout=60)
             if xml_response.status_code == 429:
                 raise NCBIRateLimitError(
                     f"NCBI rate-limited BioC-PMC XML download for {doi}"
@@ -261,6 +303,7 @@ def fallback_bioc_pmc(doi: str, output_path: Path, ncbi_email="your_email@exampl
                 f"Failed to download XML from BioC-PMC URL {xml_url}: {xml_err}"
             )
             return False
+    return False
 
 
 def fallback_elsevier_api(
@@ -297,9 +340,7 @@ def fallback_elsevier_api(
 
     doi = paper_metadata["doi"]
     api_url = f"https://api.elsevier.com/content/article/doi/{doi}"
-    accept_header = (
-        "application/xml" if preferred_type == "xml" else "application/pdf"
-    )
+    accept_header = "application/xml" if preferred_type == "xml" else "application/pdf"
     headers = {"Accept": accept_header, "X-ELS-APIKey": elsevier_api_key}
 
     logger.info(
@@ -312,9 +353,7 @@ def fallback_elsevier_api(
         if response.status_code in [401, 403]:
             error_text = response.text
             if "APIKEY_INVALID" in error_text:
-                logger.error(
-                    "Invalid API key. Couldn't download via Elsevier API."
-                )
+                logger.error("Invalid API key. Couldn't download via Elsevier API.")
             else:
                 logger.error(
                     f"{response.status_code} Unauthorized/Forbidden. Couldn't download via Elsevier API."
@@ -330,15 +369,11 @@ def fallback_elsevier_api(
             try:
                 etree.fromstring(content)
             except etree.XMLSyntaxError as e:
-                logger.warning(
-                    f"Elsevier API returned invalid XML for {doi}: {e}"
-                )
+                logger.warning(f"Elsevier API returned invalid XML for {doi}: {e}")
                 return False
         elif preferred_type == "pdf":
             if not content.startswith(b"%PDF"):
-                logger.warning(
-                    f"Elsevier API did not return a valid PDF for {doi}."
-                )
+                logger.warning(f"Elsevier API did not return a valid PDF for {doi}.")
                 return False
 
         with open(file_path, "wb") as f:
@@ -351,6 +386,7 @@ def fallback_elsevier_api(
     except requests.exceptions.RequestException as e:
         logger.error(f"Could not download via Elsevier API for {doi}: {e}")
         return False
+
 
 def fallback_elife_xml(doi: str, output_path: Path) -> bool:
     """
@@ -709,7 +745,9 @@ def fallback_s3(
     return True
 
 
-def fallback_unpaywall(doi: str, output_path: Union[str,Path], mail: str, final_url: str) -> bool:
+def fallback_unpaywall(
+    doi: str, output_path: Union[str, Path], mail: str, final_url: str
+) -> bool:
     """
     Attempt to download the PDF via Unpaywall.
     Unpaywall is a service that finds open access versions of paywalled articles.
@@ -732,8 +770,10 @@ def fallback_unpaywall(doi: str, output_path: Union[str,Path], mail: str, final_
             logger.info(f"No open access version found for {doi} on Unpaywall.")
             return False
         pdf_url = data.get("best_oa_location", {}).get("url_for_pdf", None)
-        if final_url== pdf_url:
-            logger.info(f"Unpaywall returned the same URL as the redirected URL for {doi}")
+        if final_url == pdf_url:
+            logger.info(
+                f"Unpaywall returned the same URL as the redirected URL for {doi}"
+            )
             return False
 
         if pdf_url:
@@ -753,6 +793,7 @@ def fallback_unpaywall(doi: str, output_path: Union[str,Path], mail: str, final_
     except Exception as e:
         logger.warning(f"Error during Unpaywall fallback for {doi}: {e}")
         return False
+
 
 def fallback_springer_api(
     paper_metadata: Dict[str, Any],
@@ -794,11 +835,15 @@ def fallback_springer_api(
                 if pdf_response.content[:4] == b"%PDF":
                     with open(output_path.with_suffix(".pdf"), "wb+") as f:
                         f.write(pdf_response.content)
-                    logger.info(f"Successfully downloaded PDF via Springer Open Access API for {doi}.")
+                    logger.info(
+                        f"Successfully downloaded PDF via Springer Open Access API for {doi}."
+                    )
                     return True
 
     except Exception as e:
-        logger.info(f"Springer Open Access API failed for {doi}: {e}. Trying metadata API.")
+        logger.info(
+            f"Springer Open Access API failed for {doi}: {e}. Trying metadata API."
+        )
 
     # Fallback to metadata API (TDM)
     api_url = f"https://api.springernature.com/metadata/v2/json?q=doi:{doi}&api_key={springer_api_key}"
@@ -817,7 +862,9 @@ def fallback_springer_api(
                 if pdf_response.content[:4] == b"%PDF":
                     with open(output_path.with_suffix(".pdf"), "wb+") as f:
                         f.write(pdf_response.content)
-                    logger.info(f"Successfully downloaded PDF via Springer Metadata API for {doi}.")
+                    logger.info(
+                        f"Successfully downloaded PDF via Springer Metadata API for {doi}."
+                    )
                     return True
     except Exception as e:
         logger.error(f"Could not download via Springer API for {doi}: {e}")
@@ -840,16 +887,16 @@ def fallback_plos_api(doi: str, output_path: Path) -> bool:
     try:
         # Construct the URL based on common PLOS URL patterns
         # e.g., https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0000001&type=printable
-        journal_match = re.search(r'journal\.(\w+)', doi)
+        journal_match = re.search(r"journal\.(\w+)", doi)
         if not journal_match:
             logger.warning(f"Could not determine PLOS journal from DOI: {doi}")
             return False
         journal_short_name = journal_match.group(1)
         # 'pone' is a special case, it maps to 'plosone' in the URL
-        if journal_short_name == 'pone':
-            journal_name = 'plosone'
+        if journal_short_name == "pone":
+            journal_name = "plosone"
         else:
-            journal_name = f'plos{journal_short_name}'
+            journal_name = f"plos{journal_short_name}"
 
         pdf_url = f"https://journals.plos.org/{journal_name}/article/file?id={doi}&type=printable"
 
@@ -866,7 +913,6 @@ def fallback_plos_api(doi: str, output_path: Path) -> bool:
     except Exception as e:
         logger.error(f"Error during PLOS fallback for {doi}: {e}")
         return False
-
 
 
 def fallback_europepmc(doi: str, output_path: Path) -> bool:
@@ -888,11 +934,7 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
     """
     # First, search for the article using DOI to get PMCID
     search_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
-    search_params = {
-        "query": f'DOI:"{doi}"',
-        "format": "json",
-        "resultType": "core"
-    }
+    search_params = {"query": f'DOI:"{doi}"', "format": "json", "resultType": "core"}
 
     try:
         search_response = requests.get(search_url, params=search_params, timeout=60)
@@ -910,11 +952,15 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
             candidate_pmcid = result.get("pmcid")
             if candidate_pmcid:
                 pmcid = candidate_pmcid
-                logger.info(f"Found PMCID {pmcid} for DOI {doi} in Europe PMC (result {results.index(result) + 1} of {len(results)}).")
+                logger.info(
+                    f"Found PMCID {pmcid} for DOI {doi} in Europe PMC (result {results.index(result) + 1} of {len(results)})."
+                )
                 break
 
         if not pmcid:
-            logger.warning(f"No PMCID available for DOI {doi} in Europe PMC (searched {len(results)} results).")
+            logger.warning(
+                f"No PMCID available for DOI {doi} in Europe PMC (searched {len(results)} results)."
+            )
             return False
 
     except Exception as search_err:
@@ -934,7 +980,9 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
             xml_path = output_path.with_suffix(".xml")
             with open(xml_path, "wb") as f:
                 f.write(xml_content)
-            logger.info(f"Successfully downloaded XML from Europe PMC for DOI {doi} to {xml_path}.")
+            logger.info(
+                f"Successfully downloaded XML from Europe PMC for DOI {doi} to {xml_path}."
+            )
             return True
         else:
             logger.warning(f"Europe PMC did not return valid XML for DOI {doi}.")
@@ -944,7 +992,6 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
         logger.error(f"Failed to download XML from Europe PMC for DOI {doi}: {xml_err}")
         return False
 
-from urllib.parse import quote
 
 def fallback_openalex(doi: str, output_path: Path) -> bool:
     """
@@ -965,7 +1012,9 @@ def fallback_openalex(doi: str, output_path: Path) -> bool:
         if not pdf_url:
             # Fallbacks: try other locations OpenAlex exposes
             primary = data.get("primary_location") or {}
-            pdf_url = primary.get("pdf_url") or (best.get("landing_page_url") if best.get("is_oa") else None)
+            pdf_url = primary.get("pdf_url") or (
+                best.get("landing_page_url") if best.get("is_oa") else None
+            )
 
         if not pdf_url:
             logger.info(f"OpenAlex: no OA PDF for {doi}")
@@ -986,7 +1035,9 @@ def fallback_openalex(doi: str, output_path: Path) -> bool:
         return False
 
 
-def fallback_crossref_links(doi: str, output_path: Path, contact_email: str = "your_email@example.com") -> bool:
+def fallback_crossref_links(
+    doi: str, output_path: Path, contact_email: str = "your_email@example.com"
+) -> bool:
     """
     Use Crossref /works to find publisher-provided text-mining PDF links.
     Prefers links with intended-application='text-mining' and content-type='application/pdf'.
@@ -1019,7 +1070,9 @@ def fallback_crossref_links(doi: str, output_path: Path, contact_email: str = "y
                 if pdf.content.startswith(b"%PDF"):
                     with open(output_path.with_suffix(".pdf"), "wb") as f:
                         f.write(pdf.content)
-                    logger.info(f"Successfully downloaded PDF via Crossref link for {doi}.")
+                    logger.info(
+                        f"Successfully downloaded PDF via Crossref link for {doi}."
+                    )
                     return True
             except Exception as sub_e:
                 logger.info(f"Crossref link failed for {doi}: {sub_e}")
@@ -1106,8 +1159,14 @@ def fallback_medrxiv_s3(
 
     token = doi.split("/")[-1].lower()
     executor = ThreadPoolExecutor(max_workers=workers)
-    futures = {executor.submit(find_meca_for_doi, s3, bucket, key, token): key for key in meca_keys}
-    pbar = tqdm(total=len(futures), desc=f"Scanning in medrxiv with {workers} workers for {doi}…")
+    futures = {
+        executor.submit(find_meca_for_doi, s3, bucket, key, token): key
+        for key in meca_keys
+    }
+    pbar = tqdm(
+        total=len(futures),
+        desc=f"Scanning in medrxiv with {workers} workers for {doi}…",
+    )
     target = None
     for fut in as_completed(futures):
         key = futures[fut]
@@ -1127,7 +1186,9 @@ def fallback_medrxiv_s3(
         logger.error(f"Could not find {doi} on medrxiv")
         return False
 
-    data = s3.get_object(Bucket=bucket, Key=target, RequestPayer="requester")["Body"].read()
+    data = s3.get_object(Bucket=bucket, Key=target, RequestPayer="requester")[
+        "Body"
+    ].read()
     output_path = Path(output_path)
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         for name in z.namelist():
@@ -1171,7 +1232,6 @@ def fallback_doaj(doi: str, output_path: Path) -> bool:
     except Exception as e:
         logger.error(f"DOAJ fallback failed for {doi}: {e}")
         return False
-
 
 
 FALLBACKS: Dict[str, Callable] = {

@@ -375,8 +375,11 @@ class TestPDF:
             FALLBACKS["elsevier"](paper_metadata, output_path, api_keys)
             assert mock_get.called
             mock_get.assert_called_with(
-                "https://api.elsevier.com/content/article/doi/10.1016/j.xops.2024.100504?apiKey=test_key&httpAccept=text%2Fxml",
-                headers={"Accept": "application/xml"},
+                "https://api.elsevier.com/content/article/doi/10.1016/j.xops.2024.100504",
+                headers={
+                    "Accept": "application/xml",
+                    "X-ELS-APIKey": "test_key",
+                },
                 timeout=60,
             )
             xml_path = output_path.with_suffix(".xml")
