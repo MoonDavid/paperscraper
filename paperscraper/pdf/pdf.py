@@ -345,24 +345,33 @@ def save_pdf(
     if FALLBACKS["bioc_pmc"](doi, output_path, mail or "your_email@example.com"):
         return {"success": True, "method": "bioc_pmc", "filetype": "xml"}
 
-    if (
-        "biorxiv" in doi.lower()
-        and api_keys.get("AWS_ACCESS_KEY_ID")
-        and api_keys.get("AWS_SECRET_ACCESS_KEY")
-    ):
-        if FALLBACKS["s3"](doi, output_path, api_keys):
-            return {"success": True, "method": "biorxiv_s3", "filetype": "pdf"}
+    # bioRxiv / medRxiv share the 10.1101 DOI prefix. Prefer explicit name/URL matches.
+    doi_l = doi.lower()
+    final_l = (final_url or "").lower()
+    has_aws = bool(
+        api_keys.get("AWS_ACCESS_KEY_ID") and api_keys.get("AWS_SECRET_ACCESS_KEY")
+    )
+    is_medrxiv = "medrxiv" in doi_l or "medrxiv" in final_l
+    is_biorxiv = "biorxiv" in doi_l or "biorxiv" in final_l
+    is_1101 = doi_l.startswith("10.1101/")
 
-    if (
-        "medrxiv" in doi.lower()
-        and api_keys.get("AWS_ACCESS_KEY_ID")
-        and api_keys.get("AWS_SECRET_ACCESS_KEY")
-        and "medrxiv_s3" in FALLBACKS
-    ):
+    if has_aws and is_medrxiv and "medrxiv_s3" in FALLBACKS:
         if FALLBACKS["medrxiv_s3"](doi, output_path, api_keys):
             return {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
 
-    if "plos" in doi.lower():
+    if has_aws and (is_biorxiv or (is_1101 and not is_medrxiv)):
+        if FALLBACKS["s3"](doi, output_path, api_keys):
+            return {"success": True, "method": "biorxiv_s3", "filetype": "pdf"}
+        # Ambiguous 10.1101 (no explicit bioRxiv signal): also try medRxiv S3.
+        if (
+            is_1101
+            and not is_biorxiv
+            and "medrxiv_s3" in FALLBACKS
+            and FALLBACKS["medrxiv_s3"](doi, output_path, api_keys)
+        ):
+            return {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
+
+    if "plos" in doi_l:
         if FALLBACKS["plos"](doi, output_path):
             return {"success": True, "method": "plos", "filetype": "pdf"}
 

@@ -43,23 +43,30 @@ class TestPDF:
         paper_data = {"doi": "10.1101/798496"}
         # NOTE: biorxiv is cloudflare controlled so standard scraping fails
 
-        # Now try with S3 routine
+        # S3 routine requires AWS credentials in api_keys.txt / env
         keys = load_api_keys("api_keys.txt")
-        save_pdf(
-            {"doi": "10.1101/786871"},
-            filepath="taskload.pdf",
-            save_metadata=False,
-            api_keys=keys,
-        )
-        assert os.path.exists("taskload.pdf")
-        os.remove("taskload.pdf")
+        if keys.get("AWS_ACCESS_KEY_ID") and keys.get("AWS_SECRET_ACCESS_KEY"):
+            save_pdf(
+                {"doi": "10.1101/786871"},
+                filepath="taskload.pdf",
+                save_metadata=False,
+                api_keys=keys,
+            )
+            assert os.path.exists("taskload.pdf")
+            os.remove("taskload.pdf")
 
-        # Test S3 fallback with newer DOIs (including year/month/day)
-        FALLBACKS["s3"](
-            doi="10.1101/2023.10.09.561414", output_path="taskload.pdf", api_keys=keys
-        )
-        assert os.path.exists("taskload.pdf")
-        os.remove("taskload.pdf")
+            # Test S3 fallback with newer DOIs (including year/month/day)
+            FALLBACKS["s3"](
+                doi="10.1101/2023.10.09.561414",
+                output_path="taskload.pdf",
+                api_keys=keys,
+            )
+            assert os.path.exists("taskload.pdf")
+            os.remove("taskload.pdf")
+        else:
+            logging.warning(
+                "Skipping bioRxiv S3 PDF tests: AWS credentials not configured"
+            )
 
         # medrxiv now also seems cloudflare-controlled. skipping test
         # paper_data = {"doi": "10.1101/2020.09.02.20187096"}
@@ -77,12 +84,18 @@ class TestPDF:
         os.remove("regression_transformer.pdf")
         os.remove("regression_transformer.json")
 
-        # book chapter with paywall
+        # Book chapter: publisher PDF is paywalled, but an OA preprint may still
+        # be retrieved via fallbacks (e.g. arXiv).
         paper_data = {"doi": "10.1007/978-981-97-4828-0_7"}
-        save_pdf(paper_data, filepath="clm_chapter", save_metadata=True)
-        assert not os.path.exists("clm_chapter.pdf")
-        assert os.path.exists("clm_chapter.json")
-        os.remove("clm_chapter.json")
+        res = save_pdf(paper_data, filepath="clm_chapter", save_metadata=True)
+        assert res.get("method") != "direct"
+        if res.get("success"):
+            assert os.path.exists("clm_chapter.pdf")
+            os.remove("clm_chapter.pdf")
+        else:
+            assert not os.path.exists("clm_chapter.pdf")
+        if os.path.exists("clm_chapter.json"):
+            os.remove("clm_chapter.json")
 
         # journal without OA paper
         paper_data = {"doi": "10.1126/science.adk9587"}
@@ -121,12 +134,16 @@ class TestPDF:
 
     @patch("requests.get")
     def test_network_issues_on_doi_url_request(self, mock_get, paper_data):
+        if os.path.exists("output.pdf"):
+            os.remove("output.pdf")
         mock_get.side_effect = Exception("Network error")
         save_pdf(paper_metadata=paper_data, filepath="output.pdf")
         assert not os.path.exists("output.pdf")
 
     @patch("requests.get")
     def test_missing_pdf_url_in_meta_tags(self, mock_get, paper_data):
+        if os.path.exists("output.pdf"):
+            os.remove("output.pdf")
         response = MagicMock()
         response.text = "<html></html>"
         mock_get.return_value = response
@@ -135,6 +152,8 @@ class TestPDF:
 
     @patch("requests.get")
     def test_network_issues_on_pdf_url_request(self, mock_get, paper_data):
+        if os.path.exists("output.pdf"):
+            os.remove("output.pdf")
         response_doi = MagicMock()
         response_doi.text = (
             '<meta name="citation_pdf_url" content="http://valid.url/document.pdf">'

@@ -33,6 +33,20 @@ class NCBIRateLimitError(RuntimeError):
     """Raised when NCBI returns a rate-limit response."""
 
 
+def _is_pdf_bytes(content: Any) -> bool:
+    """Return True if content looks like a PDF byte payload."""
+    return isinstance(content, (bytes, bytearray)) and content.startswith(b"%PDF")
+
+
+def _write_pdf_bytes(output_path: Path, content: bytes) -> bool:
+    """Write PDF bytes to disk only after validating the payload."""
+    if not _is_pdf_bytes(content):
+        return False
+    with open(Path(output_path).with_suffix(".pdf"), "wb") as f:
+        f.write(content)
+    return True
+
+
 class WileyRateLimiter:
     """
     Smart rate limiter for Wiley API that handles both:
@@ -668,81 +682,92 @@ def fallback_s3(
     Returns:
         True if download succeeded, False otherwise.
     """
-
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=api_keys.get("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=api_keys.get("AWS_SECRET_ACCESS_KEY"),
-        region_name="us-east-1",
-        config=Config(connect_timeout=5, read_timeout=10, retries={"max_attempts": 3}),
-    )
-    bucket = "biorxiv-src-monthly"
-
-    # Derive prefix from DOI date
-    prefix = f"Current_Content/{month_folder(doi)}/"
-
-    # List MECA archives in that month
-    meca_keys = list_meca_keys(s3, bucket, prefix)
-    if not meca_keys:
+    if not api_keys.get("AWS_ACCESS_KEY_ID") or not api_keys.get(
+        "AWS_SECRET_ACCESS_KEY"
+    ):
+        logger.info("No AWS credentials found, skipping bioRxiv S3 fallback.")
         return False
 
-    token = doi.split("/")[-1].lower()
-
-    # Prefer keys that already contain the token
-    candidate_keys = [k for k in meca_keys if token in k.lower()]
-    # If none contain the token (older DOIs, etc.), fall back to a small prefix scan
-    if not candidate_keys:
-        candidate_keys = meca_keys[: min(500, len(meca_keys))]
-    out_pdf = Path(output_path).with_suffix(".pdf")
-
-    # Try candidates concurrently but keep at most `workers` in flight.
-    stop = threading.Event()
-
-    def job(k):
-        ok = _try_download_pdf_from_meca(s3, bucket, k, out_pdf, stop)
-        if ok:
-            stop.set()
-        return ok
-
-    executor = ThreadPoolExecutor(max_workers=workers)
-    found = False
     try:
-        it = iter(candidate_keys)
-        # prime the queue with at most `workers` tasks
-        futures = set()
-        for _ in range(min(workers, len(candidate_keys))):
-            k = next(it, None)
-            if k is not None:
-                futures.add(executor.submit(job, k))
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=api_keys.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=api_keys.get("AWS_SECRET_ACCESS_KEY"),
+            region_name="us-east-1",
+            config=Config(
+                connect_timeout=5, read_timeout=10, retries={"max_attempts": 3}
+            ),
+        )
+        bucket = "biorxiv-src-monthly"
 
-        while futures and not found:
-            done, futures = wait(futures, return_when=FIRST_COMPLETED)
-            # check completed ones
-            for fut in done:
-                try:
-                    if fut.result():
-                        found = True
-                        stop.set()
-                        # cancel not-yet-started tasks
-                        for f in list(futures):
-                            f.cancel()
-                        break
-                except Exception:
-                    pass
-            # top up queue if still searching
-            while not found and len(futures) < workers:
+        # Derive prefix from DOI date
+        prefix = f"Current_Content/{month_folder(doi)}/"
+
+        # List MECA archives in that month
+        meca_keys = list_meca_keys(s3, bucket, prefix)
+        if not meca_keys:
+            return False
+
+        token = doi.split("/")[-1].lower()
+
+        # Prefer keys that already contain the token
+        candidate_keys = [k for k in meca_keys if token in k.lower()]
+        # If none contain the token (older DOIs, etc.), fall back to a small prefix scan
+        if not candidate_keys:
+            candidate_keys = meca_keys[: min(500, len(meca_keys))]
+        out_pdf = Path(output_path).with_suffix(".pdf")
+
+        # Try candidates concurrently but keep at most `workers` in flight.
+        stop = threading.Event()
+
+        def job(k):
+            ok = _try_download_pdf_from_meca(s3, bucket, k, out_pdf, stop)
+            if ok:
+                stop.set()
+            return ok
+
+        executor = ThreadPoolExecutor(max_workers=workers)
+        found = False
+        try:
+            it = iter(candidate_keys)
+            # prime the queue with at most `workers` tasks
+            futures = set()
+            for _ in range(min(workers, len(candidate_keys))):
                 k = next(it, None)
-                if k is None:
-                    break
-                futures.add(executor.submit(job, k))
-    finally:
-        # don't wait for running tasks; best-effort cancel
-        executor.shutdown(wait=False, cancel_futures=True)
+                if k is not None:
+                    futures.add(executor.submit(job, k))
 
-    if not found:
-        logger.error(f"Could not find {doi} on biorxiv")
+            while futures and not found:
+                done, futures = wait(futures, return_when=FIRST_COMPLETED)
+                # check completed ones
+                for fut in done:
+                    try:
+                        if fut.result():
+                            found = True
+                            stop.set()
+                            # cancel not-yet-started tasks
+                            for f in list(futures):
+                                f.cancel()
+                            break
+                    except Exception:
+                        pass
+                # top up queue if still searching
+                while not found and len(futures) < workers:
+                    k = next(it, None)
+                    if k is None:
+                        break
+                    futures.add(executor.submit(job, k))
+        finally:
+            # don't wait for running tasks; best-effort cancel
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        if not found:
+            logger.error(f"Could not find {doi} on biorxiv")
+            return False
+        return True
+    except Exception as e:
+        logger.error(f"bioRxiv S3 fallback failed for {doi}: {e}")
         return False
-    return True
 
 
 def fallback_unpaywall(
@@ -1022,12 +1047,9 @@ def fallback_openalex(doi: str, output_path: Path) -> bool:
 
         pdf = requests.get(pdf_url, timeout=60)
         pdf.raise_for_status()
-        if not pdf.content.startswith(b"%PDF"):
+        if not _write_pdf_bytes(output_path, pdf.content):
             logger.warning(f"OpenAlex PDF URL did not return a PDF for {doi}")
             return False
-
-        with open(output_path.with_suffix(".pdf"), "wb") as f:
-            f.write(pdf.content)
         logger.info(f"Successfully downloaded PDF via OpenAlex for {doi}.")
         return True
     except Exception as e:
@@ -1067,9 +1089,7 @@ def fallback_crossref_links(
             try:
                 pdf = requests.get(pdf_url, headers=headers, timeout=60)
                 pdf.raise_for_status()
-                if pdf.content.startswith(b"%PDF"):
-                    with open(output_path.with_suffix(".pdf"), "wb") as f:
-                        f.write(pdf.content)
+                if _write_pdf_bytes(output_path, pdf.content):
                     logger.info(
                         f"Successfully downloaded PDF via Crossref link for {doi}."
                     )
@@ -1106,11 +1126,9 @@ def fallback_arxiv(doi: str, output_path: Path) -> bool:
         pdf_url = abs_url.replace("/abs/", "/pdf/") + ".pdf"
         pdf = requests.get(pdf_url, timeout=60)
         pdf.raise_for_status()
-        if not pdf.content.startswith(b"%PDF"):
+        if not _write_pdf_bytes(output_path, pdf.content):
             logger.warning(f"arXiv URL did not return a PDF for {doi}")
             return False
-        with open(output_path.with_suffix(".pdf"), "wb") as f:
-            f.write(pdf.content)
         logger.info(f"Successfully downloaded PDF via arXiv for {doi}.")
         return True
     except Exception as e:
@@ -1139,64 +1157,74 @@ def fallback_medrxiv_s3(
     """
     Download a medRxiv PDF via the requester-pays S3 bucket using range requests.
     """
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=api_keys.get("AWS_ACCESS_KEY_ID"),
-        aws_secret_access_key=api_keys.get("AWS_SECRET_ACCESS_KEY"),
-        region_name="us-east-1",
-    )
-    bucket = "medrxiv-src-monthly"
+    if not api_keys.get("AWS_ACCESS_KEY_ID") or not api_keys.get(
+        "AWS_SECRET_ACCESS_KEY"
+    ):
+        logger.info("No AWS credentials found, skipping medRxiv S3 fallback.")
+        return False
+
     try:
-        prefix = f"Current_Content/{month_folder_medrxiv(doi)}/"
-    except Exception as e:
-        logger.error(f"Could not resolve medRxiv month folder for {doi}: {e}")
-        return False
-
-    meca_keys = list_meca_keys(s3, bucket, prefix)
-    if not meca_keys:
-        logger.info(f"No MECA archives in {bucket}/{prefix} for {doi}")
-        return False
-
-    token = doi.split("/")[-1].lower()
-    executor = ThreadPoolExecutor(max_workers=workers)
-    futures = {
-        executor.submit(find_meca_for_doi, s3, bucket, key, token): key
-        for key in meca_keys
-    }
-    pbar = tqdm(
-        total=len(futures),
-        desc=f"Scanning in medrxiv with {workers} workers for {doi}…",
-    )
-    target = None
-    for fut in as_completed(futures):
-        key = futures[fut]
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=api_keys.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=api_keys.get("AWS_SECRET_ACCESS_KEY"),
+            region_name="us-east-1",
+        )
+        bucket = "medrxiv-src-monthly"
         try:
-            if fut.result():
-                target = key
-                pbar.set_description(f"Success! Found target {doi} in {key}")
-                for other in futures:
-                    other.cancel()
-                break
-        except Exception:
-            pass
-        finally:
-            pbar.update(1)
-    executor.shutdown(wait=False)
-    if target is None:
-        logger.error(f"Could not find {doi} on medrxiv")
-        return False
+            prefix = f"Current_Content/{month_folder_medrxiv(doi)}/"
+        except Exception as e:
+            logger.error(f"Could not resolve medRxiv month folder for {doi}: {e}")
+            return False
 
-    data = s3.get_object(Bucket=bucket, Key=target, RequestPayer="requester")[
-        "Body"
-    ].read()
-    output_path = Path(output_path)
-    with zipfile.ZipFile(io.BytesIO(data)) as z:
-        for name in z.namelist():
-            if name.lower().endswith(".pdf"):
-                z.extract(name, path=output_path.parent)
-                (output_path.parent / name).rename(output_path.with_suffix(".pdf"))
-                return True
-    return False
+        meca_keys = list_meca_keys(s3, bucket, prefix)
+        if not meca_keys:
+            logger.info(f"No MECA archives in {bucket}/{prefix} for {doi}")
+            return False
+
+        token = doi.split("/")[-1].lower()
+        executor = ThreadPoolExecutor(max_workers=workers)
+        futures = {
+            executor.submit(find_meca_for_doi, s3, bucket, key, token): key
+            for key in meca_keys
+        }
+        pbar = tqdm(
+            total=len(futures),
+            desc=f"Scanning in medrxiv with {workers} workers for {doi}…",
+        )
+        target = None
+        for fut in as_completed(futures):
+            key = futures[fut]
+            try:
+                if fut.result():
+                    target = key
+                    pbar.set_description(f"Success! Found target {doi} in {key}")
+                    for other in futures:
+                        other.cancel()
+                    break
+            except Exception:
+                pass
+            finally:
+                pbar.update(1)
+        executor.shutdown(wait=False)
+        if target is None:
+            logger.error(f"Could not find {doi} on medrxiv")
+            return False
+
+        data = s3.get_object(Bucket=bucket, Key=target, RequestPayer="requester")[
+            "Body"
+        ].read()
+        output_path = Path(output_path)
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            for name in z.namelist():
+                if name.lower().endswith(".pdf"):
+                    z.extract(name, path=output_path.parent)
+                    (output_path.parent / name).rename(output_path.with_suffix(".pdf"))
+                    return True
+        return False
+    except Exception as e:
+        logger.error(f"medRxiv S3 fallback failed for {doi}: {e}")
+        return False
 
 
 def fallback_doaj(doi: str, output_path: Path) -> bool:
@@ -1219,10 +1247,8 @@ def fallback_doaj(doi: str, output_path: Path) -> bool:
                 try:
                     pdf = requests.get(pdf_url, timeout=60)
                     pdf.raise_for_status()
-                    if not pdf.content.startswith(b"%PDF"):
+                    if not _write_pdf_bytes(output_path, pdf.content):
                         continue
-                    with open(output_path.with_suffix(".pdf"), "wb") as f:
-                        f.write(pdf.content)
                     logger.info(f"Successfully downloaded PDF via DOAJ for {doi}.")
                     return True
                 except Exception:
