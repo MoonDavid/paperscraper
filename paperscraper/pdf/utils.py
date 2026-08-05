@@ -15,6 +15,9 @@ def load_api_keys(filepath: Optional[str] = None) -> Dict[str, str]:
     Example:
         WILEY_TDM_API_TOKEN=your_wiley_token_here
         ELSEVIER_TDM_API_KEY=your_elsevier_key_here
+        SPRINGER_API_KEY=your_springer_key_here
+        AWS_ACCESS_KEY_ID=your_aws_access_key_here
+        AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
 
     Args:
         filepath: Optional path to the file containing API keys.
@@ -30,6 +33,7 @@ def load_api_keys(filepath: Optional[str] = None) -> Dict[str, str]:
     return {
         "WILEY_TDM_API_TOKEN": os.getenv("WILEY_TDM_API_TOKEN"),
         "ELSEVIER_TDM_API_KEY": os.getenv("ELSEVIER_TDM_API_KEY"),
+        "SPRINGER_API_KEY": os.getenv("SPRINGER_API_KEY"),
         "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
         "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
     }

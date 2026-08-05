@@ -3,7 +3,6 @@
 import json
 import logging
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
@@ -114,6 +113,7 @@ def _write_metadata(metadata: Dict[str, Any], output_path: Path) -> bool:
         logger.error(f"Failed to save metadata to {str(output_path)}: {exc}")
         return False
 
+
 # python
 def _get_abstract_pubmed(pmid: str, timeout: int = 20) -> Optional[str]:
     """
@@ -137,6 +137,7 @@ def _get_abstract_pubmed(pmid: str, timeout: int = 20) -> Optional[str]:
         logger.warning(f"PubMed fetch failed for PMID={pmid}: {e}")
         return None
 
+
 def _get_abstract_crossref(doi: str, timeout: int = 20) -> Optional[str]:
     """
     Query Crossref works API and return the abstract (HTML cleaned) or None.
@@ -153,6 +154,7 @@ def _get_abstract_crossref(doi: str, timeout: int = 20) -> Optional[str]:
     except Exception as e:
         logger.warning(f"Crossref fetch failed for DOI={doi}: {e}")
         return None
+
 
 # python
 def _get_abstract_europepmc(doi: str, timeout: int = 20) -> Optional[str]:
@@ -185,8 +187,8 @@ def _get_abstract_europepmc(doi: str, timeout: int = 20) -> Optional[str]:
         logger.warning(f"EuropePMC fetch failed for DOI={doi}: {e}")
         return None
 
-# --- Replace abstract retrieval section in save_pdf with the following block ---
 
+# --- Replace abstract retrieval section in save_pdf with the following block ---
 
 
 def save_pdf(
@@ -195,7 +197,7 @@ def save_pdf(
     save_metadata: bool = False,
     api_keys: Optional[Union[str, Dict[str, str]]] = None,
     preferred_type: str = "pdf",
-    mail: Optional[str] = None
+    mail: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Save a PDF file of a paper.
@@ -233,6 +235,31 @@ def save_pdf(
     used_filetype: Optional[str] = None
     soup = None
     final_url = None
+
+    # ChemRxiv HTML pages are often Cloudflare-blocked; use the Open Engage API.
+    if "chemrxiv" in doi.lower():
+        item = _get_chemrxiv_item(doi, user_agent)
+        if item:
+            if save_metadata:
+                _write_metadata(_chemrxiv_metadata_from_item(item, doi), output_path)
+            pdf_url = _chemrxiv_pdf_url(item)
+            if pdf_url:
+                try:
+                    if download_pdf_to_path(pdf_url, output_path, user_agent):
+                        return {
+                            "success": True,
+                            "method": "chemrxiv",
+                            "filetype": "pdf",
+                        }
+                    logger.warning(
+                        f"ChemRxiv Open Engage PDF endpoint did not return a PDF: {pdf_url}"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"ChemRxiv Open Engage PDF download failed for {doi}: {e}"
+                    )
+            else:
+                logger.warning(f"ChemRxiv API response missing PDF URL for {doi}")
 
     try:
         response = requests.get(url, timeout=60)
@@ -315,27 +342,36 @@ def save_pdf(
     if FALLBACKS["europepmc"](doi, output_path):
         return {"success": True, "method": "europepmc", "filetype": "xml"}
 
-    if FALLBACKS["bioc_pmc"](doi, output_path, mail):
+    if FALLBACKS["bioc_pmc"](doi, output_path, mail or "your_email@example.com"):
         return {"success": True, "method": "bioc_pmc", "filetype": "xml"}
 
-    if (
-        "biorxiv" in doi.lower()
-        and api_keys.get("AWS_ACCESS_KEY_ID")
-        and api_keys.get("AWS_SECRET_ACCESS_KEY")
-    ):
-        if FALLBACKS["s3"](doi, output_path, api_keys):
-            return {"success": True, "method": "biorxiv_s3", "filetype": "pdf"}
+    # bioRxiv / medRxiv share the 10.1101 DOI prefix. Prefer explicit name/URL matches.
+    doi_l = doi.lower()
+    final_l = (final_url or "").lower()
+    has_aws = bool(
+        api_keys.get("AWS_ACCESS_KEY_ID") and api_keys.get("AWS_SECRET_ACCESS_KEY")
+    )
+    is_medrxiv = "medrxiv" in doi_l or "medrxiv" in final_l
+    is_biorxiv = "biorxiv" in doi_l or "biorxiv" in final_l
+    is_1101 = doi_l.startswith("10.1101/")
 
-    if (
-        "medrxiv" in doi.lower()
-        and api_keys.get("AWS_ACCESS_KEY_ID")
-        and api_keys.get("AWS_SECRET_ACCESS_KEY")
-        and "medrxiv_s3" in FALLBACKS
-    ):
+    if has_aws and is_medrxiv and "medrxiv_s3" in FALLBACKS:
         if FALLBACKS["medrxiv_s3"](doi, output_path, api_keys):
             return {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
 
-    if "plos" in doi.lower():
+    if has_aws and (is_biorxiv or (is_1101 and not is_medrxiv)):
+        if FALLBACKS["s3"](doi, output_path, api_keys):
+            return {"success": True, "method": "biorxiv_s3", "filetype": "pdf"}
+        # Ambiguous 10.1101 (no explicit bioRxiv signal): also try medRxiv S3.
+        if (
+            is_1101
+            and not is_biorxiv
+            and "medrxiv_s3" in FALLBACKS
+            and FALLBACKS["medrxiv_s3"](doi, output_path, api_keys)
+        ):
+            return {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
+
+    if "plos" in doi_l:
         if FALLBACKS["plos"](doi, output_path):
             return {"success": True, "method": "plos", "filetype": "pdf"}
 
@@ -347,7 +383,9 @@ def save_pdf(
     if "openalex" in FALLBACKS and FALLBACKS["openalex"](doi, output_path):
         return {"success": True, "method": "openalex", "filetype": "pdf"}
 
-    if "crossref" in FALLBACKS and FALLBACKS["crossref"](doi, output_path, mail or "your_email@example.com"):
+    if "crossref" in FALLBACKS and FALLBACKS["crossref"](
+        doi, output_path, mail or "your_email@example.com"
+    ):
         return {"success": True, "method": "crossref", "filetype": "pdf"}
 
     if "doaj" in FALLBACKS and FALLBACKS["doaj"](doi, output_path):
@@ -362,16 +400,17 @@ def save_pdf(
             if FALLBACKS["springer"](paper_metadata, output_path, api_keys):
                 return {"success": True, "method": "springer", "filetype": "pdf"}
         if api_keys.get("WILEY_TDM_API_TOKEN"):
-            if FALLBACKS["wiley"](
-                paper_metadata, output_path, api_keys
-            ):
+            if FALLBACKS["wiley"](paper_metadata, output_path, api_keys):
                 return {"success": True, "method": "wiley", "filetype": "pdf"}
         if api_keys.get("ELSEVIER_TDM_API_KEY"):
             if FALLBACKS["elsevier"](
                 paper_metadata, output_path, api_keys, preferred_type=preferred_type
             ):
-                return {"success": True, "method": "elsevier", "filetype": preferred_type}
-
+                return {
+                    "success": True,
+                    "method": "elsevier",
+                    "filetype": preferred_type,
+                }
 
     logger.warning(f"All download attempts failed for {doi}.")
     # --- Replace the previous "save abstract as .txt when all attempts failed" block with this ---
@@ -384,7 +423,11 @@ def save_pdf(
         abstract_text = None
 
     # 2) If no abstract yet and pmid present, try PubMed Entrez
-    if not abstract_text and isinstance(paper_metadata, dict) and paper_metadata.get("pubmed_id"):
+    if (
+        not abstract_text
+        and isinstance(paper_metadata, dict)
+        and paper_metadata.get("pubmed_id")
+    ):
         pmid = str(paper_metadata.get("pubmed_id"))
         abstract_text = _get_abstract_pubmed(pmid)
 
@@ -416,7 +459,7 @@ def save_pdf_from_dump(
     save_metadata: bool = False,
     api_keys: Optional[str] = None,
     preferred_type: str = "pdf",
-    mail: Optional[str] = None
+    mail: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Receives a path to a `.jsonl` dump with paper metadata and saves the PDF files of
@@ -445,6 +488,10 @@ def save_pdf_from_dump(
 
     if not isinstance(key_to_save, str):
         raise TypeError(f"key_to_save must be a string, not {type(key_to_save)}.")
+    if key_to_save not in ("doi", "title", "date"):
+        raise ValueError(
+            f"key_to_save must be one of 'doi', 'title', or 'date', not {key_to_save!r}."
+        )
     if preferred_type not in ["pdf", "xml"]:
         raise ValueError("preferred_type must be one of 'pdf' or 'xml'.")
 
@@ -452,6 +499,8 @@ def save_pdf_from_dump(
 
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
+
+    os.makedirs(pdf_path, exist_ok=True)
 
     results_by_doi: Dict[str, Dict[str, Any]] = {}
     counts_by_method: Dict[str, int] = {}
@@ -461,19 +510,32 @@ def save_pdf_from_dump(
         pbar.set_description(f"Processing paper {i + 1}/{len(papers)}")
 
         if "doi" not in paper.keys() or paper["doi"] is None:
-            logger.warning(f"Skipping paper since no DOI available.")
+            logger.warning("Skipping paper since no DOI available.")
+            continue
+        if key_to_save not in paper.keys() or paper[key_to_save] is None:
+            logger.warning(
+                f"Skipping paper {paper.get('doi')} since key {key_to_save!r} is missing."
+            )
             continue
         filename = paper[key_to_save].replace("/", "_")
         pdf_file = Path(os.path.join(pdf_path, f"{filename}.pdf"))
         xml_file = pdf_file.with_suffix(".xml")
         if pdf_file.exists():
             logger.info(f"File {pdf_file} already exists. Skipping download.")
-            results_by_doi[paper["doi"]] = {"success": True, "method": "existing", "filetype": "pdf"}
+            results_by_doi[paper["doi"]] = {
+                "success": True,
+                "method": "existing",
+                "filetype": "pdf",
+            }
             counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
             continue
         if xml_file.exists():
             logger.info(f"File {xml_file} already exists. Skipping download.")
-            results_by_doi[paper["doi"]] = {"success": True, "method": "existing", "filetype": "xml"}
+            results_by_doi[paper["doi"]] = {
+                "success": True,
+                "method": "existing",
+                "filetype": "xml",
+            }
             counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
             continue
         output_path = str(pdf_file)
@@ -483,17 +545,21 @@ def save_pdf_from_dump(
             save_metadata=save_metadata,
             api_keys=api_keys,
             preferred_type=preferred_type,
-            mail=mail
+            mail=mail,
         )
         doi = paper["doi"]
         results_by_doi[doi] = result
         if result and result.get("method"):
             if result.get("success"):
-                counts_by_method[result["method"]] = counts_by_method.get(result["method"], 0) + 1
+                counts_by_method[result["method"]] = (
+                    counts_by_method.get(result["method"], 0) + 1
+                )
             else:
                 # track abstract-only separately
                 if result.get("method") == "abstract":
-                    counts_by_method["abstract_only"] = counts_by_method.get("abstract_only", 0) + 1
+                    counts_by_method["abstract_only"] = (
+                        counts_by_method.get("abstract_only", 0) + 1
+                    )
         else:
             counts_by_method["failed"] = counts_by_method.get("failed", 0) + 1
 
@@ -521,7 +587,9 @@ def _get_redirect_domain(doi: str, timeout: int = 10) -> Optional[str]:
     Resolve https://doi.org/{doi} and return the extracted domain (e.g. 'wiley') or None on failure.
     """
     try:
-        resp = requests.get(f"https://doi.org/{doi}", timeout=timeout, allow_redirects=True)
+        resp = requests.get(
+            f"https://doi.org/{doi}", timeout=timeout, allow_redirects=True
+        )
         resp.raise_for_status()
         return tldextract.extract(resp.url).domain or None
     except Exception:
@@ -542,7 +610,9 @@ def _crossref_publisher_is_wiley(doi: str, timeout: int = 10) -> bool:
         return False
 
 
-def _wiley_allowed(doi: str, final_url: Optional[str] = None, timeout: int = 10) -> bool:
+def _wiley_allowed(
+    doi: str, final_url: Optional[str] = None, timeout: int = 10
+) -> bool:
     """
     Return True if it's reasonable to attempt the Wiley TDM fallback:
     - either the DOI redirect domain contains 'wiley', or
@@ -573,6 +643,7 @@ def _wiley_allowed(doi: str, final_url: Optional[str] = None, timeout: int = 10)
         pass
 
     return False
+
 
 def debug_save_pdf(
     paper_metadata: Dict[str, Any],
@@ -642,7 +713,9 @@ def debug_save_pdf(
             if name == "crossref":
                 return FALLBACKS[name](doi, out, mail or "your_email@example.com")
             if name in ("s3", "medrxiv_s3"):
-                if api_keys.get("AWS_ACCESS_KEY_ID") and api_keys.get("AWS_SECRET_ACCESS_KEY"):
+                if api_keys.get("AWS_ACCESS_KEY_ID") and api_keys.get(
+                    "AWS_SECRET_ACCESS_KEY"
+                ):
                     return FALLBACKS[name](doi, out, api_keys)
                 return False
             if name in ("plos", "elife"):
@@ -663,7 +736,9 @@ def debug_save_pdf(
             if name == "elsevier":
                 if not api_keys.get("ELSEVIER_TDM_API_KEY"):
                     return False
-                return FALLBACKS[name](paper_metadata, out, api_keys, preferred_type=preferred_type)
+                return FALLBACKS[name](
+                    paper_metadata, out, api_keys, preferred_type=preferred_type
+                )
         except Exception:
             return False
         return False
@@ -682,7 +757,14 @@ def debug_save_pdf(
                 # stop after the first saved to limit writes
                 break
 
-    return {"direct": per.get("direct", False), "results": per, "successes": successes, "first_saved": first_saved}
+    return {
+        "direct": per.get("direct", False),
+        "results": per,
+        "successes": successes,
+        "first_saved": first_saved,
+    }
+
+
 # python
 def debug_save_pdf_from_dump(
     dump_path: str,
@@ -706,12 +788,20 @@ def debug_save_pdf_from_dump(
     counts: Dict[str, int] = {}
 
     pbar = tqdm(papers, total=len(papers), desc="Debug processing")
-    def _write_debug_stats(target_dir: str, by_doi_obj: Dict[str, Any], counts_obj: Dict[str, int]):
+
+    def _write_debug_stats(
+        target_dir: str, by_doi_obj: Dict[str, Any], counts_obj: Dict[str, int]
+    ):
         try:
             stats_path = Path(target_dir) / "debug_fallback_stats.json"
             tmp_path = stats_path.with_suffix(".tmp")
             with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump({"by_doi": by_doi_obj, "counts": counts_obj}, f, ensure_ascii=False, indent=2)
+                json.dump(
+                    {"by_doi": by_doi_obj, "counts": counts_obj},
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
             tmp_path.replace(stats_path)
             logger.info(f"Saved debug fallback stats to {stats_path}")
         except Exception as e:
@@ -746,4 +836,3 @@ def debug_save_pdf_from_dump(
     except Exception as e:
         logger.error(f"Failed to write final debug fallback stats: {e}")
     return {"by_doi": by_doi, "counts": counts}
-
