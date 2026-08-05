@@ -12,7 +12,7 @@ import tldextract
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from ..utils import load_jsonl
+from ..utils import load_papers_dump
 from .fallbacks import FALLBACKS
 from .utils import download_pdf_to_path, load_api_keys
 
@@ -462,14 +462,18 @@ def save_pdf_from_dump(
     mail: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Receives a path to a `.jsonl` dump with paper metadata and saves the PDF files of
+    Receives a path to a paper metadata dump and saves the PDF/XML files of
     each paper.
 
+    Supported dump formats:
+        - ``.jsonl`` paperscraper dumps (one JSON object per line)
+        - Web of Science tab-delimited UTF-8 exports (typically ``savedrecs.txt``)
+
     Args:
-        dump_path: Path to a `.jsonl` file with paper metadata, one paper per line.
+        dump_path: Path to a ``.jsonl`` dump or a WoS TBA ``.txt``/``.tsv`` export.
         pdf_path: Path to a folder where the files will be stored.
         key_to_save: Key in the paper metadata to use as filename.
-            Has to be `doi` or `title`. Defaults to `doi`.
+            Has to be `doi`, `title`, or `date`. Defaults to `doi`.
         save_metadata: A boolean indicating whether to save paper metadata as a separate json.
         api_keys: Path to a file with API keys. If None, API-based fallbacks will be skipped.
         preferred_type: Preferred file type to download, 'pdf' or 'xml'. Defaults to 'pdf'.
@@ -480,8 +484,17 @@ def save_pdf_from_dump(
 
     if not isinstance(dump_path, str):
         raise TypeError(f"dump_path must be a string, not {type(dump_path)}.")
-    if not dump_path.endswith(".jsonl"):
-        raise ValueError("Please provide a dump_path with .jsonl extension.")
+    lower = dump_path.lower()
+    if not (
+        lower.endswith(".jsonl")
+        or lower.endswith(".txt")
+        or lower.endswith(".tsv")
+        or lower.endswith(".csv")
+    ):
+        raise ValueError(
+            "Please provide a dump_path with .jsonl or Web of Science "
+            "tab-delimited (.txt/.tsv) extension."
+        )
 
     if not isinstance(pdf_path, str):
         raise TypeError(f"pdf_path must be a string, not {type(pdf_path)}.")
@@ -495,7 +508,7 @@ def save_pdf_from_dump(
     if preferred_type not in ["pdf", "xml"]:
         raise ValueError("preferred_type must be one of 'pdf' or 'xml'.")
 
-    papers = load_jsonl(dump_path)
+    papers = load_papers_dump(dump_path)
 
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
@@ -517,7 +530,13 @@ def save_pdf_from_dump(
                 f"Skipping paper {paper.get('doi')} since key {key_to_save!r} is missing."
             )
             continue
-        filename = paper[key_to_save].replace("/", "_")
+        filename = str(paper[key_to_save]).replace("/", "_")
+        # Soft-sanitize Windows/POSIX-hostile characters from titles etc.
+        for bad in (":", "*", "?", '"', "<", ">", "|", "\\"):
+            filename = filename.replace(bad, "_")
+        # Avoid overly long filenames from long titles.
+        if len(filename) > 180:
+            filename = filename[:180].rstrip(" ._")
         pdf_file = Path(os.path.join(pdf_path, f"{filename}.pdf"))
         xml_file = pdf_file.with_suffix(".xml")
         if pdf_file.exists():
@@ -780,7 +799,7 @@ def debug_save_pdf_from_dump(
     Writes a debug_fallback_stats.json with detailed per-DOI outcomes.
     Saves intermediate stats every `save_interval` papers so partial results are available.
     """
-    papers = load_jsonl(dump_path)
+    papers = load_papers_dump(dump_path)
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
 
