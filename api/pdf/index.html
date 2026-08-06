@@ -5821,9 +5821,17 @@ Prefers links with intended-application='text-mining' and content-type='applicat
 
     <div class="doc doc-contents ">
 
-        <p>Receives a path to a <code>.jsonl</code> dump with paper metadata and saves the PDF files of
+        <p>Receives a path to a paper metadata dump and saves the PDF/XML files of
 each paper.</p>
 
+
+<details class="supported-dump-formats" open>
+  <summary>Supported dump formats</summary>
+  <ul>
+<li><code>.jsonl</code> paperscraper dumps (one JSON object per line)</li>
+<li>Web of Science tab-delimited UTF-8 exports (typically <code>savedrecs.txt</code>)</li>
+</ul>
+</details>
 
 <p><span class="doc-section-title">Parameters:</span></p>
     <table>
@@ -5845,7 +5853,7 @@ each paper.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to a <code>.jsonl</code> file with paper metadata, one paper per line.</p>
+                <p>Path to a <code>.jsonl</code> dump or a WoS TBA <code>.txt</code>/<code>.tsv</code> export.</p>
               </div>
             </td>
             <td>
@@ -5878,7 +5886,7 @@ each paper.</p>
             <td>
               <div class="doc-md-description">
                 <p>Key in the paper metadata to use as filename.
-Has to be <code>doi</code> or <code>title</code>. Defaults to <code>doi</code>.</p>
+Has to be <code>doi</code>, <code>title</code>, or <code>date</code>. Defaults to <code>doi</code>.</p>
               </div>
             </td>
             <td>
@@ -6081,7 +6089,26 @@ Has to be <code>doi</code> or <code>title</code>. Defaults to <code>doi</code>.<
 <span class="normal"><a href="#__codelineno-0-577">577</a></span>
 <span class="normal"><a href="#__codelineno-0-578">578</a></span>
 <span class="normal"><a href="#__codelineno-0-579">579</a></span>
-<span class="normal"><a href="#__codelineno-0-580">580</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="k">def</span><span class="w"> </span><span class="nf">save_pdf_from_dump</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-580">580</a></span>
+<span class="normal"><a href="#__codelineno-0-581">581</a></span>
+<span class="normal"><a href="#__codelineno-0-582">582</a></span>
+<span class="normal"><a href="#__codelineno-0-583">583</a></span>
+<span class="normal"><a href="#__codelineno-0-584">584</a></span>
+<span class="normal"><a href="#__codelineno-0-585">585</a></span>
+<span class="normal"><a href="#__codelineno-0-586">586</a></span>
+<span class="normal"><a href="#__codelineno-0-587">587</a></span>
+<span class="normal"><a href="#__codelineno-0-588">588</a></span>
+<span class="normal"><a href="#__codelineno-0-589">589</a></span>
+<span class="normal"><a href="#__codelineno-0-590">590</a></span>
+<span class="normal"><a href="#__codelineno-0-591">591</a></span>
+<span class="normal"><a href="#__codelineno-0-592">592</a></span>
+<span class="normal"><a href="#__codelineno-0-593">593</a></span>
+<span class="normal"><a href="#__codelineno-0-594">594</a></span>
+<span class="normal"><a href="#__codelineno-0-595">595</a></span>
+<span class="normal"><a href="#__codelineno-0-596">596</a></span>
+<span class="normal"><a href="#__codelineno-0-597">597</a></span>
+<span class="normal"><a href="#__codelineno-0-598">598</a></span>
+<span class="normal"><a href="#__codelineno-0-599">599</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="k">def</span><span class="w"> </span><span class="nf">save_pdf_from_dump</span><span class="p">(</span>
 <a id="__codelineno-0-456" name="__codelineno-0-456"></a>    <span class="n">dump_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <a id="__codelineno-0-457" name="__codelineno-0-457"></a>    <span class="n">pdf_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <a id="__codelineno-0-458" name="__codelineno-0-458"></a>    <span class="n">key_to_save</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;doi&quot;</span><span class="p">,</span>
@@ -6091,122 +6118,141 @@ Has to be <code>doi</code> or <code>title</code>. Defaults to <code>doi</code>.<
 <a id="__codelineno-0-462" name="__codelineno-0-462"></a>    <span class="n">mail</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <a id="__codelineno-0-463" name="__codelineno-0-463"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <a id="__codelineno-0-464" name="__codelineno-0-464"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<a id="__codelineno-0-465" name="__codelineno-0-465"></a><span class="sd">    Receives a path to a `.jsonl` dump with paper metadata and saves the PDF files of</span>
+<a id="__codelineno-0-465" name="__codelineno-0-465"></a><span class="sd">    Receives a path to a paper metadata dump and saves the PDF/XML files of</span>
 <a id="__codelineno-0-466" name="__codelineno-0-466"></a><span class="sd">    each paper.</span>
 <a id="__codelineno-0-467" name="__codelineno-0-467"></a>
-<a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-469" name="__codelineno-0-469"></a><span class="sd">        dump_path: Path to a `.jsonl` file with paper metadata, one paper per line.</span>
-<a id="__codelineno-0-470" name="__codelineno-0-470"></a><span class="sd">        pdf_path: Path to a folder where the files will be stored.</span>
-<a id="__codelineno-0-471" name="__codelineno-0-471"></a><span class="sd">        key_to_save: Key in the paper metadata to use as filename.</span>
-<a id="__codelineno-0-472" name="__codelineno-0-472"></a><span class="sd">            Has to be `doi` or `title`. Defaults to `doi`.</span>
-<a id="__codelineno-0-473" name="__codelineno-0-473"></a><span class="sd">        save_metadata: A boolean indicating whether to save paper metadata as a separate json.</span>
-<a id="__codelineno-0-474" name="__codelineno-0-474"></a><span class="sd">        api_keys: Path to a file with API keys. If None, API-based fallbacks will be skipped.</span>
-<a id="__codelineno-0-475" name="__codelineno-0-475"></a><span class="sd">        preferred_type: Preferred file type to download, &#39;pdf&#39; or &#39;xml&#39;. Defaults to &#39;pdf&#39;.</span>
-<a id="__codelineno-0-476" name="__codelineno-0-476"></a><span class="sd">        mail: Optional email address to use for Unpaywall API requests.</span>
-<a id="__codelineno-0-477" name="__codelineno-0-477"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-478" name="__codelineno-0-478"></a><span class="sd">        A dict containing per-DOI results and counts. Also writes fallback_stats.json to pdf_path.</span>
-<a id="__codelineno-0-479" name="__codelineno-0-479"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-480" name="__codelineno-0-480"></a>
-<a id="__codelineno-0-481" name="__codelineno-0-481"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dump_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-482" name="__codelineno-0-482"></a>        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dump_path must be a string, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">dump_path</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-483" name="__codelineno-0-483"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">dump_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.jsonl&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-484" name="__codelineno-0-484"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Please provide a dump_path with .jsonl extension.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-485" name="__codelineno-0-485"></a>
-<a id="__codelineno-0-486" name="__codelineno-0-486"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-487" name="__codelineno-0-487"></a>        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pdf_path must be a string, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-488" name="__codelineno-0-488"></a>
-<a id="__codelineno-0-489" name="__codelineno-0-489"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key_to_save</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-490" name="__codelineno-0-490"></a>        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;key_to_save must be a string, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">key_to_save</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-491" name="__codelineno-0-491"></a>    <span class="k">if</span> <span class="n">key_to_save</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span> <span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-492" name="__codelineno-0-492"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<a id="__codelineno-0-493" name="__codelineno-0-493"></a>            <span class="sa">f</span><span class="s2">&quot;key_to_save must be one of &#39;doi&#39;, &#39;title&#39;, or &#39;date&#39;, not </span><span class="si">{</span><span class="n">key_to_save</span><span class="si">!r}</span><span class="s2">.&quot;</span>
-<a id="__codelineno-0-494" name="__codelineno-0-494"></a>        <span class="p">)</span>
-<a id="__codelineno-0-495" name="__codelineno-0-495"></a>    <span class="k">if</span> <span class="n">preferred_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;xml&quot;</span><span class="p">]:</span>
-<a id="__codelineno-0-496" name="__codelineno-0-496"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;preferred_type must be one of &#39;pdf&#39; or &#39;xml&#39;.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-497" name="__codelineno-0-497"></a>
-<a id="__codelineno-0-498" name="__codelineno-0-498"></a>    <span class="n">papers</span> <span class="o">=</span> <span class="n">load_jsonl</span><span class="p">(</span><span class="n">dump_path</span><span class="p">)</span>
-<a id="__codelineno-0-499" name="__codelineno-0-499"></a>
-<a id="__codelineno-0-500" name="__codelineno-0-500"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">api_keys</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-<a id="__codelineno-0-501" name="__codelineno-0-501"></a>        <span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="n">api_keys</span><span class="p">)</span>
-<a id="__codelineno-0-502" name="__codelineno-0-502"></a>
-<a id="__codelineno-0-503" name="__codelineno-0-503"></a>    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-0-504" name="__codelineno-0-504"></a>
-<a id="__codelineno-0-505" name="__codelineno-0-505"></a>    <span class="n">results_by_doi</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
-<a id="__codelineno-0-506" name="__codelineno-0-506"></a>    <span class="n">counts_by_method</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-<a id="__codelineno-0-507" name="__codelineno-0-507"></a>
-<a id="__codelineno-0-508" name="__codelineno-0-508"></a>    <span class="n">pbar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">papers</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-509" name="__codelineno-0-509"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">paper</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pbar</span><span class="p">):</span>
-<a id="__codelineno-0-510" name="__codelineno-0-510"></a>        <span class="n">pbar</span><span class="o">.</span><span class="n">set_description</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing paper </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-511" name="__codelineno-0-511"></a>
-<a id="__codelineno-0-512" name="__codelineno-0-512"></a>        <span class="k">if</span> <span class="s2">&quot;doi&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">paper</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="ow">or</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-513" name="__codelineno-0-513"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Skipping paper since no DOI available.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-514" name="__codelineno-0-514"></a>            <span class="k">continue</span>
-<a id="__codelineno-0-515" name="__codelineno-0-515"></a>        <span class="k">if</span> <span class="n">key_to_save</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">paper</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="ow">or</span> <span class="n">paper</span><span class="p">[</span><span class="n">key_to_save</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-516" name="__codelineno-0-516"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-<a id="__codelineno-0-517" name="__codelineno-0-517"></a>                <span class="sa">f</span><span class="s2">&quot;Skipping paper </span><span class="si">{</span><span class="n">paper</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;doi&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> since key </span><span class="si">{</span><span class="n">key_to_save</span><span class="si">!r}</span><span class="s2"> is missing.&quot;</span>
-<a id="__codelineno-0-518" name="__codelineno-0-518"></a>            <span class="p">)</span>
-<a id="__codelineno-0-519" name="__codelineno-0-519"></a>            <span class="k">continue</span>
-<a id="__codelineno-0-520" name="__codelineno-0-520"></a>        <span class="n">filename</span> <span class="o">=</span> <span class="n">paper</span><span class="p">[</span><span class="n">key_to_save</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-521" name="__codelineno-0-521"></a>        <span class="n">pdf_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.pdf&quot;</span><span class="p">))</span>
-<a id="__codelineno-0-522" name="__codelineno-0-522"></a>        <span class="n">xml_file</span> <span class="o">=</span> <span class="n">pdf_file</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.xml&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-523" name="__codelineno-0-523"></a>        <span class="k">if</span> <span class="n">pdf_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-<a id="__codelineno-0-524" name="__codelineno-0-524"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">pdf_file</span><span class="si">}</span><span class="s2"> already exists. Skipping download.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-525" name="__codelineno-0-525"></a>            <span class="n">results_by_doi</span><span class="p">[</span><span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-526" name="__codelineno-0-526"></a>                <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-527" name="__codelineno-0-527"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;existing&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-528" name="__codelineno-0-528"></a>                <span class="s2">&quot;filetype&quot;</span><span class="p">:</span> <span class="s2">&quot;pdf&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-529" name="__codelineno-0-529"></a>            <span class="p">}</span>
-<a id="__codelineno-0-530" name="__codelineno-0-530"></a>            <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;existing&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;existing&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
-<a id="__codelineno-0-531" name="__codelineno-0-531"></a>            <span class="k">continue</span>
-<a id="__codelineno-0-532" name="__codelineno-0-532"></a>        <span class="k">if</span> <span class="n">xml_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-<a id="__codelineno-0-533" name="__codelineno-0-533"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">xml_file</span><span class="si">}</span><span class="s2"> already exists. Skipping download.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-534" name="__codelineno-0-534"></a>            <span class="n">results_by_doi</span><span class="p">[</span><span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-535" name="__codelineno-0-535"></a>                <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-536" name="__codelineno-0-536"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;existing&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-537" name="__codelineno-0-537"></a>                <span class="s2">&quot;filetype&quot;</span><span class="p">:</span> <span class="s2">&quot;xml&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-538" name="__codelineno-0-538"></a>            <span class="p">}</span>
-<a id="__codelineno-0-539" name="__codelineno-0-539"></a>            <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;existing&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;existing&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
-<a id="__codelineno-0-540" name="__codelineno-0-540"></a>            <span class="k">continue</span>
-<a id="__codelineno-0-541" name="__codelineno-0-541"></a>        <span class="n">output_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">pdf_file</span><span class="p">)</span>
-<a id="__codelineno-0-542" name="__codelineno-0-542"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">save_pdf</span><span class="p">(</span>
-<a id="__codelineno-0-543" name="__codelineno-0-543"></a>            <span class="n">paper</span><span class="p">,</span>
-<a id="__codelineno-0-544" name="__codelineno-0-544"></a>            <span class="n">output_path</span><span class="p">,</span>
-<a id="__codelineno-0-545" name="__codelineno-0-545"></a>            <span class="n">save_metadata</span><span class="o">=</span><span class="n">save_metadata</span><span class="p">,</span>
-<a id="__codelineno-0-546" name="__codelineno-0-546"></a>            <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
-<a id="__codelineno-0-547" name="__codelineno-0-547"></a>            <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span><span class="p">,</span>
-<a id="__codelineno-0-548" name="__codelineno-0-548"></a>            <span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">,</span>
-<a id="__codelineno-0-549" name="__codelineno-0-549"></a>        <span class="p">)</span>
-<a id="__codelineno-0-550" name="__codelineno-0-550"></a>        <span class="n">doi</span> <span class="o">=</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span>
-<a id="__codelineno-0-551" name="__codelineno-0-551"></a>        <span class="n">results_by_doi</span><span class="p">[</span><span class="n">doi</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
-<a id="__codelineno-0-552" name="__codelineno-0-552"></a>        <span class="k">if</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-553" name="__codelineno-0-553"></a>            <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;success&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-554" name="__codelineno-0-554"></a>                <span class="n">counts_by_method</span><span class="p">[</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span>
-<a id="__codelineno-0-555" name="__codelineno-0-555"></a>                    <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
-<a id="__codelineno-0-556" name="__codelineno-0-556"></a>                <span class="p">)</span>
-<a id="__codelineno-0-557" name="__codelineno-0-557"></a>            <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-558" name="__codelineno-0-558"></a>                <span class="c1"># track abstract-only separately</span>
-<a id="__codelineno-0-559" name="__codelineno-0-559"></a>                <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;abstract&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-560" name="__codelineno-0-560"></a>                    <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;abstract_only&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-<a id="__codelineno-0-561" name="__codelineno-0-561"></a>                        <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;abstract_only&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
-<a id="__codelineno-0-562" name="__codelineno-0-562"></a>                    <span class="p">)</span>
-<a id="__codelineno-0-563" name="__codelineno-0-563"></a>        <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-564" name="__codelineno-0-564"></a>            <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;failed&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;failed&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
-<a id="__codelineno-0-565" name="__codelineno-0-565"></a>
-<a id="__codelineno-0-566" name="__codelineno-0-566"></a>    <span class="c1"># Save stats to file in the target directory</span>
-<a id="__codelineno-0-567" name="__codelineno-0-567"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-568" name="__codelineno-0-568"></a>        <span class="n">stats</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-569" name="__codelineno-0-569"></a>            <span class="s2">&quot;total&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">),</span>
-<a id="__codelineno-0-570" name="__codelineno-0-570"></a>            <span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts_by_method</span><span class="p">,</span>
-<a id="__codelineno-0-571" name="__codelineno-0-571"></a>            <span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">results_by_doi</span><span class="p">,</span>
-<a id="__codelineno-0-572" name="__codelineno-0-572"></a>        <span class="p">}</span>
-<a id="__codelineno-0-573" name="__codelineno-0-573"></a>        <span class="n">stats_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;fallback_stats.json&quot;</span>
-<a id="__codelineno-0-574" name="__codelineno-0-574"></a>        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">stats_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-<a id="__codelineno-0-575" name="__codelineno-0-575"></a>            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<a id="__codelineno-0-576" name="__codelineno-0-576"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved fallback stats to </span><span class="si">{</span><span class="n">stats_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-577" name="__codelineno-0-577"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-578" name="__codelineno-0-578"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write fallback stats: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-579" name="__codelineno-0-579"></a>
-<a id="__codelineno-0-580" name="__codelineno-0-580"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts_by_method</span><span class="p">,</span> <span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">results_by_doi</span><span class="p">}</span>
+<a id="__codelineno-0-468" name="__codelineno-0-468"></a><span class="sd">    Supported dump formats:</span>
+<a id="__codelineno-0-469" name="__codelineno-0-469"></a><span class="sd">        - ``.jsonl`` paperscraper dumps (one JSON object per line)</span>
+<a id="__codelineno-0-470" name="__codelineno-0-470"></a><span class="sd">        - Web of Science tab-delimited UTF-8 exports (typically ``savedrecs.txt``)</span>
+<a id="__codelineno-0-471" name="__codelineno-0-471"></a>
+<a id="__codelineno-0-472" name="__codelineno-0-472"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-473" name="__codelineno-0-473"></a><span class="sd">        dump_path: Path to a ``.jsonl`` dump or a WoS TBA ``.txt``/``.tsv`` export.</span>
+<a id="__codelineno-0-474" name="__codelineno-0-474"></a><span class="sd">        pdf_path: Path to a folder where the files will be stored.</span>
+<a id="__codelineno-0-475" name="__codelineno-0-475"></a><span class="sd">        key_to_save: Key in the paper metadata to use as filename.</span>
+<a id="__codelineno-0-476" name="__codelineno-0-476"></a><span class="sd">            Has to be `doi`, `title`, or `date`. Defaults to `doi`.</span>
+<a id="__codelineno-0-477" name="__codelineno-0-477"></a><span class="sd">        save_metadata: A boolean indicating whether to save paper metadata as a separate json.</span>
+<a id="__codelineno-0-478" name="__codelineno-0-478"></a><span class="sd">        api_keys: Path to a file with API keys. If None, API-based fallbacks will be skipped.</span>
+<a id="__codelineno-0-479" name="__codelineno-0-479"></a><span class="sd">        preferred_type: Preferred file type to download, &#39;pdf&#39; or &#39;xml&#39;. Defaults to &#39;pdf&#39;.</span>
+<a id="__codelineno-0-480" name="__codelineno-0-480"></a><span class="sd">        mail: Optional email address to use for Unpaywall API requests.</span>
+<a id="__codelineno-0-481" name="__codelineno-0-481"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-482" name="__codelineno-0-482"></a><span class="sd">        A dict containing per-DOI results and counts. Also writes fallback_stats.json to pdf_path.</span>
+<a id="__codelineno-0-483" name="__codelineno-0-483"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-484" name="__codelineno-0-484"></a>
+<a id="__codelineno-0-485" name="__codelineno-0-485"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dump_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-486" name="__codelineno-0-486"></a>        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dump_path must be a string, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">dump_path</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-487" name="__codelineno-0-487"></a>    <span class="n">lower</span> <span class="o">=</span> <span class="n">dump_path</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+<a id="__codelineno-0-488" name="__codelineno-0-488"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
+<a id="__codelineno-0-489" name="__codelineno-0-489"></a>        <span class="n">lower</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.jsonl&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-490" name="__codelineno-0-490"></a>        <span class="ow">or</span> <span class="n">lower</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.txt&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-491" name="__codelineno-0-491"></a>        <span class="ow">or</span> <span class="n">lower</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.tsv&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-492" name="__codelineno-0-492"></a>        <span class="ow">or</span> <span class="n">lower</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.csv&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-493" name="__codelineno-0-493"></a>    <span class="p">):</span>
+<a id="__codelineno-0-494" name="__codelineno-0-494"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-495" name="__codelineno-0-495"></a>            <span class="s2">&quot;Please provide a dump_path with .jsonl or Web of Science &quot;</span>
+<a id="__codelineno-0-496" name="__codelineno-0-496"></a>            <span class="s2">&quot;tab-delimited (.txt/.tsv) extension.&quot;</span>
+<a id="__codelineno-0-497" name="__codelineno-0-497"></a>        <span class="p">)</span>
+<a id="__codelineno-0-498" name="__codelineno-0-498"></a>
+<a id="__codelineno-0-499" name="__codelineno-0-499"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-500" name="__codelineno-0-500"></a>        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pdf_path must be a string, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-501" name="__codelineno-0-501"></a>
+<a id="__codelineno-0-502" name="__codelineno-0-502"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">key_to_save</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-503" name="__codelineno-0-503"></a>        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;key_to_save must be a string, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">key_to_save</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-504" name="__codelineno-0-504"></a>    <span class="k">if</span> <span class="n">key_to_save</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span> <span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-505" name="__codelineno-0-505"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-506" name="__codelineno-0-506"></a>            <span class="sa">f</span><span class="s2">&quot;key_to_save must be one of &#39;doi&#39;, &#39;title&#39;, or &#39;date&#39;, not </span><span class="si">{</span><span class="n">key_to_save</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+<a id="__codelineno-0-507" name="__codelineno-0-507"></a>        <span class="p">)</span>
+<a id="__codelineno-0-508" name="__codelineno-0-508"></a>    <span class="k">if</span> <span class="n">preferred_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;xml&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-509" name="__codelineno-0-509"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;preferred_type must be one of &#39;pdf&#39; or &#39;xml&#39;.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-510" name="__codelineno-0-510"></a>
+<a id="__codelineno-0-511" name="__codelineno-0-511"></a>    <span class="n">papers</span> <span class="o">=</span> <span class="n">load_papers_dump</span><span class="p">(</span><span class="n">dump_path</span><span class="p">)</span>
+<a id="__codelineno-0-512" name="__codelineno-0-512"></a>
+<a id="__codelineno-0-513" name="__codelineno-0-513"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">api_keys</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+<a id="__codelineno-0-514" name="__codelineno-0-514"></a>        <span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="n">api_keys</span><span class="p">)</span>
+<a id="__codelineno-0-515" name="__codelineno-0-515"></a>
+<a id="__codelineno-0-516" name="__codelineno-0-516"></a>    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-0-517" name="__codelineno-0-517"></a>
+<a id="__codelineno-0-518" name="__codelineno-0-518"></a>    <span class="n">results_by_doi</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-0-519" name="__codelineno-0-519"></a>    <span class="n">counts_by_method</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-0-520" name="__codelineno-0-520"></a>
+<a id="__codelineno-0-521" name="__codelineno-0-521"></a>    <span class="n">pbar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">papers</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-522" name="__codelineno-0-522"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">paper</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pbar</span><span class="p">):</span>
+<a id="__codelineno-0-523" name="__codelineno-0-523"></a>        <span class="n">pbar</span><span class="o">.</span><span class="n">set_description</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing paper </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-524" name="__codelineno-0-524"></a>
+<a id="__codelineno-0-525" name="__codelineno-0-525"></a>        <span class="k">if</span> <span class="s2">&quot;doi&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">paper</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="ow">or</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-526" name="__codelineno-0-526"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Skipping paper since no DOI available.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-527" name="__codelineno-0-527"></a>            <span class="k">continue</span>
+<a id="__codelineno-0-528" name="__codelineno-0-528"></a>        <span class="k">if</span> <span class="n">key_to_save</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">paper</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="ow">or</span> <span class="n">paper</span><span class="p">[</span><span class="n">key_to_save</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-529" name="__codelineno-0-529"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-0-530" name="__codelineno-0-530"></a>                <span class="sa">f</span><span class="s2">&quot;Skipping paper </span><span class="si">{</span><span class="n">paper</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;doi&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> since key </span><span class="si">{</span><span class="n">key_to_save</span><span class="si">!r}</span><span class="s2"> is missing.&quot;</span>
+<a id="__codelineno-0-531" name="__codelineno-0-531"></a>            <span class="p">)</span>
+<a id="__codelineno-0-532" name="__codelineno-0-532"></a>            <span class="k">continue</span>
+<a id="__codelineno-0-533" name="__codelineno-0-533"></a>        <span class="n">filename</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">paper</span><span class="p">[</span><span class="n">key_to_save</span><span class="p">])</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-534" name="__codelineno-0-534"></a>        <span class="c1"># Soft-sanitize Windows/POSIX-hostile characters from titles etc.</span>
+<a id="__codelineno-0-535" name="__codelineno-0-535"></a>        <span class="k">for</span> <span class="n">bad</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span> <span class="s1">&#39;&quot;&#39;</span><span class="p">,</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;|&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-536" name="__codelineno-0-536"></a>            <span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">bad</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-537" name="__codelineno-0-537"></a>        <span class="c1"># Avoid overly long filenames from long titles.</span>
+<a id="__codelineno-0-538" name="__codelineno-0-538"></a>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">180</span><span class="p">:</span>
+<a id="__codelineno-0-539" name="__codelineno-0-539"></a>            <span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[:</span><span class="mi">180</span><span class="p">]</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot; ._&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-540" name="__codelineno-0-540"></a>        <span class="n">pdf_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.pdf&quot;</span><span class="p">))</span>
+<a id="__codelineno-0-541" name="__codelineno-0-541"></a>        <span class="n">xml_file</span> <span class="o">=</span> <span class="n">pdf_file</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.xml&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-542" name="__codelineno-0-542"></a>        <span class="k">if</span> <span class="n">pdf_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+<a id="__codelineno-0-543" name="__codelineno-0-543"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">pdf_file</span><span class="si">}</span><span class="s2"> already exists. Skipping download.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-544" name="__codelineno-0-544"></a>            <span class="n">results_by_doi</span><span class="p">[</span><span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-545" name="__codelineno-0-545"></a>                <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-546" name="__codelineno-0-546"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;existing&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-547" name="__codelineno-0-547"></a>                <span class="s2">&quot;filetype&quot;</span><span class="p">:</span> <span class="s2">&quot;pdf&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-548" name="__codelineno-0-548"></a>            <span class="p">}</span>
+<a id="__codelineno-0-549" name="__codelineno-0-549"></a>            <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;existing&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;existing&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-550" name="__codelineno-0-550"></a>            <span class="k">continue</span>
+<a id="__codelineno-0-551" name="__codelineno-0-551"></a>        <span class="k">if</span> <span class="n">xml_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+<a id="__codelineno-0-552" name="__codelineno-0-552"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">xml_file</span><span class="si">}</span><span class="s2"> already exists. Skipping download.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-553" name="__codelineno-0-553"></a>            <span class="n">results_by_doi</span><span class="p">[</span><span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-554" name="__codelineno-0-554"></a>                <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-555" name="__codelineno-0-555"></a>                <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="s2">&quot;existing&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-556" name="__codelineno-0-556"></a>                <span class="s2">&quot;filetype&quot;</span><span class="p">:</span> <span class="s2">&quot;xml&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-557" name="__codelineno-0-557"></a>            <span class="p">}</span>
+<a id="__codelineno-0-558" name="__codelineno-0-558"></a>            <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;existing&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;existing&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-559" name="__codelineno-0-559"></a>            <span class="k">continue</span>
+<a id="__codelineno-0-560" name="__codelineno-0-560"></a>        <span class="n">output_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">pdf_file</span><span class="p">)</span>
+<a id="__codelineno-0-561" name="__codelineno-0-561"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">save_pdf</span><span class="p">(</span>
+<a id="__codelineno-0-562" name="__codelineno-0-562"></a>            <span class="n">paper</span><span class="p">,</span>
+<a id="__codelineno-0-563" name="__codelineno-0-563"></a>            <span class="n">output_path</span><span class="p">,</span>
+<a id="__codelineno-0-564" name="__codelineno-0-564"></a>            <span class="n">save_metadata</span><span class="o">=</span><span class="n">save_metadata</span><span class="p">,</span>
+<a id="__codelineno-0-565" name="__codelineno-0-565"></a>            <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
+<a id="__codelineno-0-566" name="__codelineno-0-566"></a>            <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span><span class="p">,</span>
+<a id="__codelineno-0-567" name="__codelineno-0-567"></a>            <span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">,</span>
+<a id="__codelineno-0-568" name="__codelineno-0-568"></a>        <span class="p">)</span>
+<a id="__codelineno-0-569" name="__codelineno-0-569"></a>        <span class="n">doi</span> <span class="o">=</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-570" name="__codelineno-0-570"></a>        <span class="n">results_by_doi</span><span class="p">[</span><span class="n">doi</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+<a id="__codelineno-0-571" name="__codelineno-0-571"></a>        <span class="k">if</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-572" name="__codelineno-0-572"></a>            <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;success&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-573" name="__codelineno-0-573"></a>                <span class="n">counts_by_method</span><span class="p">[</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-0-574" name="__codelineno-0-574"></a>                    <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-575" name="__codelineno-0-575"></a>                <span class="p">)</span>
+<a id="__codelineno-0-576" name="__codelineno-0-576"></a>            <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-577" name="__codelineno-0-577"></a>                <span class="c1"># track abstract-only separately</span>
+<a id="__codelineno-0-578" name="__codelineno-0-578"></a>                <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;abstract&quot;</span><span class="p">:</span>
+<a id="__codelineno-0-579" name="__codelineno-0-579"></a>                    <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;abstract_only&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+<a id="__codelineno-0-580" name="__codelineno-0-580"></a>                        <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;abstract_only&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-581" name="__codelineno-0-581"></a>                    <span class="p">)</span>
+<a id="__codelineno-0-582" name="__codelineno-0-582"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-583" name="__codelineno-0-583"></a>            <span class="n">counts_by_method</span><span class="p">[</span><span class="s2">&quot;failed&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts_by_method</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;failed&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-584" name="__codelineno-0-584"></a>
+<a id="__codelineno-0-585" name="__codelineno-0-585"></a>    <span class="c1"># Save stats to file in the target directory</span>
+<a id="__codelineno-0-586" name="__codelineno-0-586"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-587" name="__codelineno-0-587"></a>        <span class="n">stats</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-588" name="__codelineno-0-588"></a>            <span class="s2">&quot;total&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">),</span>
+<a id="__codelineno-0-589" name="__codelineno-0-589"></a>            <span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts_by_method</span><span class="p">,</span>
+<a id="__codelineno-0-590" name="__codelineno-0-590"></a>            <span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">results_by_doi</span><span class="p">,</span>
+<a id="__codelineno-0-591" name="__codelineno-0-591"></a>        <span class="p">}</span>
+<a id="__codelineno-0-592" name="__codelineno-0-592"></a>        <span class="n">stats_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;fallback_stats.json&quot;</span>
+<a id="__codelineno-0-593" name="__codelineno-0-593"></a>        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">stats_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<a id="__codelineno-0-594" name="__codelineno-0-594"></a>            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-0-595" name="__codelineno-0-595"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved fallback stats to </span><span class="si">{</span><span class="n">stats_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-596" name="__codelineno-0-596"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-597" name="__codelineno-0-597"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write fallback stats: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-598" name="__codelineno-0-598"></a>
+<a id="__codelineno-0-599" name="__codelineno-0-599"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts_by_method</span><span class="p">,</span> <span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">results_by_doi</span><span class="p">}</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6231,26 +6277,7 @@ Writes results per-fallback to distinct files with ".{fallback}" suffix to avoid
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>paperscraper/pdf/pdf.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-648">648</a></span>
-<span class="normal"><a href="#__codelineno-0-649">649</a></span>
-<span class="normal"><a href="#__codelineno-0-650">650</a></span>
-<span class="normal"><a href="#__codelineno-0-651">651</a></span>
-<span class="normal"><a href="#__codelineno-0-652">652</a></span>
-<span class="normal"><a href="#__codelineno-0-653">653</a></span>
-<span class="normal"><a href="#__codelineno-0-654">654</a></span>
-<span class="normal"><a href="#__codelineno-0-655">655</a></span>
-<span class="normal"><a href="#__codelineno-0-656">656</a></span>
-<span class="normal"><a href="#__codelineno-0-657">657</a></span>
-<span class="normal"><a href="#__codelineno-0-658">658</a></span>
-<span class="normal"><a href="#__codelineno-0-659">659</a></span>
-<span class="normal"><a href="#__codelineno-0-660">660</a></span>
-<span class="normal"><a href="#__codelineno-0-661">661</a></span>
-<span class="normal"><a href="#__codelineno-0-662">662</a></span>
-<span class="normal"><a href="#__codelineno-0-663">663</a></span>
-<span class="normal"><a href="#__codelineno-0-664">664</a></span>
-<span class="normal"><a href="#__codelineno-0-665">665</a></span>
-<span class="normal"><a href="#__codelineno-0-666">666</a></span>
-<span class="normal"><a href="#__codelineno-0-667">667</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-667">667</a></span>
 <span class="normal"><a href="#__codelineno-0-668">668</a></span>
 <span class="normal"><a href="#__codelineno-0-669">669</a></span>
 <span class="normal"><a href="#__codelineno-0-670">670</a></span>
@@ -6348,124 +6375,143 @@ Writes results per-fallback to distinct files with ".{fallback}" suffix to avoid
 <span class="normal"><a href="#__codelineno-0-762">762</a></span>
 <span class="normal"><a href="#__codelineno-0-763">763</a></span>
 <span class="normal"><a href="#__codelineno-0-764">764</a></span>
-<span class="normal"><a href="#__codelineno-0-765">765</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-648" name="__codelineno-0-648"></a><span class="k">def</span><span class="w"> </span><span class="nf">debug_save_pdf</span><span class="p">(</span>
-<a id="__codelineno-0-649" name="__codelineno-0-649"></a>    <span class="n">paper_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-<a id="__codelineno-0-650" name="__codelineno-0-650"></a>    <span class="n">filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span>
-<a id="__codelineno-0-651" name="__codelineno-0-651"></a>    <span class="n">api_keys</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-652" name="__codelineno-0-652"></a>    <span class="n">preferred_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pdf&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-653" name="__codelineno-0-653"></a>    <span class="n">mail</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-654" name="__codelineno-0-654"></a>    <span class="n">save_first_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-655" name="__codelineno-0-655"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-656" name="__codelineno-0-656"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<a id="__codelineno-0-657" name="__codelineno-0-657"></a><span class="sd">    Debug version that attempts the direct method and all fallbacks independently.</span>
-<a id="__codelineno-0-658" name="__codelineno-0-658"></a><span class="sd">    Writes results per-fallback to distinct files with &quot;.{fallback}&quot; suffix to avoid clobbering.</span>
-<a id="__codelineno-0-659" name="__codelineno-0-659"></a>
-<a id="__codelineno-0-660" name="__codelineno-0-660"></a><span class="sd">    Returns a dict with keys: direct, successes (list), results (per-fallback bool), first_saved (fallback name or None).</span>
-<a id="__codelineno-0-661" name="__codelineno-0-661"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-662" name="__codelineno-0-662"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">api_keys</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-<a id="__codelineno-0-663" name="__codelineno-0-663"></a>        <span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="n">api_keys</span><span class="p">)</span>
-<a id="__codelineno-0-664" name="__codelineno-0-664"></a>
-<a id="__codelineno-0-665" name="__codelineno-0-665"></a>    <span class="n">doi</span> <span class="o">=</span> <span class="n">paper_metadata</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span>
-<a id="__codelineno-0-666" name="__codelineno-0-666"></a>    <span class="n">base_output</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
-<a id="__codelineno-0-667" name="__codelineno-0-667"></a>    <span class="n">successes</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-668" name="__codelineno-0-668"></a>    <span class="n">per</span> <span class="o">=</span> <span class="p">{}</span>
-<a id="__codelineno-0-669" name="__codelineno-0-669"></a>
-<a id="__codelineno-0-670" name="__codelineno-0-670"></a>    <span class="c1"># Use a unique path for the initial direct check so save_pdf doesn&#39;t</span>
-<a id="__codelineno-0-671" name="__codelineno-0-671"></a>    <span class="c1"># already save a fallback to the main output and interfere with later attempts.</span>
-<a id="__codelineno-0-672" name="__codelineno-0-672"></a>    <span class="n">direct_check_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">base_output</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;.direct_check&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-673" name="__codelineno-0-673"></a>    <span class="n">direct_res</span> <span class="o">=</span> <span class="n">save_pdf</span><span class="p">(</span>
-<a id="__codelineno-0-674" name="__codelineno-0-674"></a>        <span class="n">paper_metadata</span><span class="p">,</span>
-<a id="__codelineno-0-675" name="__codelineno-0-675"></a>        <span class="n">direct_check_path</span><span class="p">,</span>
-<a id="__codelineno-0-676" name="__codelineno-0-676"></a>        <span class="n">save_metadata</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-<a id="__codelineno-0-677" name="__codelineno-0-677"></a>        <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
-<a id="__codelineno-0-678" name="__codelineno-0-678"></a>        <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span><span class="p">,</span>
-<a id="__codelineno-0-679" name="__codelineno-0-679"></a>        <span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">,</span>
-<a id="__codelineno-0-680" name="__codelineno-0-680"></a>    <span class="p">)</span>
-<a id="__codelineno-0-681" name="__codelineno-0-681"></a>
-<a id="__codelineno-0-682" name="__codelineno-0-682"></a>    <span class="c1"># Only treat &quot;direct&quot; as successful if the returned method is actually &quot;direct&quot;</span>
-<a id="__codelineno-0-683" name="__codelineno-0-683"></a>    <span class="n">is_direct</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">direct_res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;success&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">direct_res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;direct&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-684" name="__codelineno-0-684"></a>    <span class="k">if</span> <span class="n">is_direct</span><span class="p">:</span>
-<a id="__codelineno-0-685" name="__codelineno-0-685"></a>        <span class="n">successes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-686" name="__codelineno-0-686"></a>    <span class="n">per</span><span class="p">[</span><span class="s2">&quot;direct&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_direct</span>
-<a id="__codelineno-0-687" name="__codelineno-0-687"></a>    <span class="n">first_saved</span> <span class="o">=</span> <span class="s2">&quot;direct&quot;</span> <span class="k">if</span> <span class="n">per</span><span class="p">[</span><span class="s2">&quot;direct&quot;</span><span class="p">]</span> <span class="k">else</span> <span class="kc">None</span>
+<span class="normal"><a href="#__codelineno-0-765">765</a></span>
+<span class="normal"><a href="#__codelineno-0-766">766</a></span>
+<span class="normal"><a href="#__codelineno-0-767">767</a></span>
+<span class="normal"><a href="#__codelineno-0-768">768</a></span>
+<span class="normal"><a href="#__codelineno-0-769">769</a></span>
+<span class="normal"><a href="#__codelineno-0-770">770</a></span>
+<span class="normal"><a href="#__codelineno-0-771">771</a></span>
+<span class="normal"><a href="#__codelineno-0-772">772</a></span>
+<span class="normal"><a href="#__codelineno-0-773">773</a></span>
+<span class="normal"><a href="#__codelineno-0-774">774</a></span>
+<span class="normal"><a href="#__codelineno-0-775">775</a></span>
+<span class="normal"><a href="#__codelineno-0-776">776</a></span>
+<span class="normal"><a href="#__codelineno-0-777">777</a></span>
+<span class="normal"><a href="#__codelineno-0-778">778</a></span>
+<span class="normal"><a href="#__codelineno-0-779">779</a></span>
+<span class="normal"><a href="#__codelineno-0-780">780</a></span>
+<span class="normal"><a href="#__codelineno-0-781">781</a></span>
+<span class="normal"><a href="#__codelineno-0-782">782</a></span>
+<span class="normal"><a href="#__codelineno-0-783">783</a></span>
+<span class="normal"><a href="#__codelineno-0-784">784</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-667" name="__codelineno-0-667"></a><span class="k">def</span><span class="w"> </span><span class="nf">debug_save_pdf</span><span class="p">(</span>
+<a id="__codelineno-0-668" name="__codelineno-0-668"></a>    <span class="n">paper_metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+<a id="__codelineno-0-669" name="__codelineno-0-669"></a>    <span class="n">filepath</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">],</span>
+<a id="__codelineno-0-670" name="__codelineno-0-670"></a>    <span class="n">api_keys</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-671" name="__codelineno-0-671"></a>    <span class="n">preferred_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pdf&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-672" name="__codelineno-0-672"></a>    <span class="n">mail</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-673" name="__codelineno-0-673"></a>    <span class="n">save_first_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-674" name="__codelineno-0-674"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-675" name="__codelineno-0-675"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-676" name="__codelineno-0-676"></a><span class="sd">    Debug version that attempts the direct method and all fallbacks independently.</span>
+<a id="__codelineno-0-677" name="__codelineno-0-677"></a><span class="sd">    Writes results per-fallback to distinct files with &quot;.{fallback}&quot; suffix to avoid clobbering.</span>
+<a id="__codelineno-0-678" name="__codelineno-0-678"></a>
+<a id="__codelineno-0-679" name="__codelineno-0-679"></a><span class="sd">    Returns a dict with keys: direct, successes (list), results (per-fallback bool), first_saved (fallback name or None).</span>
+<a id="__codelineno-0-680" name="__codelineno-0-680"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-681" name="__codelineno-0-681"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">api_keys</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+<a id="__codelineno-0-682" name="__codelineno-0-682"></a>        <span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="n">api_keys</span><span class="p">)</span>
+<a id="__codelineno-0-683" name="__codelineno-0-683"></a>
+<a id="__codelineno-0-684" name="__codelineno-0-684"></a>    <span class="n">doi</span> <span class="o">=</span> <span class="n">paper_metadata</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-685" name="__codelineno-0-685"></a>    <span class="n">base_output</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+<a id="__codelineno-0-686" name="__codelineno-0-686"></a>    <span class="n">successes</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-687" name="__codelineno-0-687"></a>    <span class="n">per</span> <span class="o">=</span> <span class="p">{}</span>
 <a id="__codelineno-0-688" name="__codelineno-0-688"></a>
-<a id="__codelineno-0-689" name="__codelineno-0-689"></a>    <span class="c1"># Build a deterministic list of fallbacks</span>
-<a id="__codelineno-0-690" name="__codelineno-0-690"></a>    <span class="n">order</span> <span class="o">=</span> <span class="p">[</span>
-<a id="__codelineno-0-691" name="__codelineno-0-691"></a>        <span class="s2">&quot;unpaywall&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-692" name="__codelineno-0-692"></a>        <span class="s2">&quot;europepmc&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-693" name="__codelineno-0-693"></a>        <span class="s2">&quot;bioc_pmc&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-694" name="__codelineno-0-694"></a>        <span class="s2">&quot;plos&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-695" name="__codelineno-0-695"></a>        <span class="s2">&quot;elife&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-696" name="__codelineno-0-696"></a>        <span class="s2">&quot;openalex&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-697" name="__codelineno-0-697"></a>        <span class="s2">&quot;crossref&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-698" name="__codelineno-0-698"></a>        <span class="s2">&quot;doaj&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-699" name="__codelineno-0-699"></a>        <span class="s2">&quot;arxiv&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-700" name="__codelineno-0-700"></a>        <span class="s2">&quot;springer&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-701" name="__codelineno-0-701"></a>        <span class="s2">&quot;wiley&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-702" name="__codelineno-0-702"></a>        <span class="s2">&quot;elsevier&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-703" name="__codelineno-0-703"></a>    <span class="p">]</span>
-<a id="__codelineno-0-704" name="__codelineno-0-704"></a>
-<a id="__codelineno-0-705" name="__codelineno-0-705"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_attempt</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<a id="__codelineno-0-706" name="__codelineno-0-706"></a>        <span class="c1"># derive unique output stem for debug</span>
-<a id="__codelineno-0-707" name="__codelineno-0-707"></a>        <span class="n">out</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">base_output</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;.</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-708" name="__codelineno-0-708"></a>        <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-709" name="__codelineno-0-709"></a>            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;unpaywall&quot;</span> <span class="ow">and</span> <span class="n">mail</span><span class="p">:</span>
-<a id="__codelineno-0-710" name="__codelineno-0-710"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">mail</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-<a id="__codelineno-0-711" name="__codelineno-0-711"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;europepmc&quot;</span><span class="p">,</span> <span class="s2">&quot;doaj&quot;</span><span class="p">,</span> <span class="s2">&quot;openalex&quot;</span><span class="p">,</span> <span class="s2">&quot;arxiv&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-712" name="__codelineno-0-712"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
-<a id="__codelineno-0-713" name="__codelineno-0-713"></a>            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;crossref&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-714" name="__codelineno-0-714"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">mail</span> <span class="ow">or</span> <span class="s2">&quot;your_email@example.com&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-715" name="__codelineno-0-715"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;s3&quot;</span><span class="p">,</span> <span class="s2">&quot;medrxiv_s3&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-716" name="__codelineno-0-716"></a>                <span class="k">if</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;AWS_ACCESS_KEY_ID&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-<a id="__codelineno-0-717" name="__codelineno-0-717"></a>                    <span class="s2">&quot;AWS_SECRET_ACCESS_KEY&quot;</span>
-<a id="__codelineno-0-718" name="__codelineno-0-718"></a>                <span class="p">):</span>
-<a id="__codelineno-0-719" name="__codelineno-0-719"></a>                    <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">api_keys</span><span class="p">)</span>
-<a id="__codelineno-0-720" name="__codelineno-0-720"></a>                <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-721" name="__codelineno-0-721"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;plos&quot;</span><span class="p">,</span> <span class="s2">&quot;elife&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-722" name="__codelineno-0-722"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
-<a id="__codelineno-0-723" name="__codelineno-0-723"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;wiley&quot;</span><span class="p">,</span> <span class="s2">&quot;springer&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-724" name="__codelineno-0-724"></a>                <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;wiley&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-725" name="__codelineno-0-725"></a>                    <span class="k">if</span> <span class="ow">not</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;WILEY_TDM_API_TOKEN&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-726" name="__codelineno-0-726"></a>                        <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-727" name="__codelineno-0-727"></a>                    <span class="c1"># Only try Wiley when applicable</span>
-<a id="__codelineno-0-728" name="__codelineno-0-728"></a>                    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-729" name="__codelineno-0-729"></a>                        <span class="k">if</span> <span class="ow">not</span> <span class="n">_wiley_allowed</span><span class="p">(</span><span class="n">doi</span><span class="p">):</span>
-<a id="__codelineno-0-730" name="__codelineno-0-730"></a>                            <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-731" name="__codelineno-0-731"></a>                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-<a id="__codelineno-0-732" name="__codelineno-0-732"></a>                        <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-733" name="__codelineno-0-733"></a>                <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;springer&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SPRINGER_API_KEY&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-734" name="__codelineno-0-734"></a>                    <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-735" name="__codelineno-0-735"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">paper_metadata</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">api_keys</span><span class="p">)</span>
-<a id="__codelineno-0-736" name="__codelineno-0-736"></a>            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;elsevier&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-737" name="__codelineno-0-737"></a>                <span class="k">if</span> <span class="ow">not</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ELSEVIER_TDM_API_KEY&quot;</span><span class="p">):</span>
-<a id="__codelineno-0-738" name="__codelineno-0-738"></a>                    <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-739" name="__codelineno-0-739"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span>
-<a id="__codelineno-0-740" name="__codelineno-0-740"></a>                    <span class="n">paper_metadata</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">api_keys</span><span class="p">,</span> <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span>
-<a id="__codelineno-0-741" name="__codelineno-0-741"></a>                <span class="p">)</span>
-<a id="__codelineno-0-742" name="__codelineno-0-742"></a>        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-<a id="__codelineno-0-743" name="__codelineno-0-743"></a>            <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-744" name="__codelineno-0-744"></a>        <span class="k">return</span> <span class="kc">False</span>
-<a id="__codelineno-0-745" name="__codelineno-0-745"></a>
-<a id="__codelineno-0-746" name="__codelineno-0-746"></a>    <span class="k">for</span> <span class="n">fb</span> <span class="ow">in</span> <span class="n">order</span><span class="p">:</span>
-<a id="__codelineno-0-747" name="__codelineno-0-747"></a>        <span class="k">if</span> <span class="n">fb</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">FALLBACKS</span><span class="p">:</span>
-<a id="__codelineno-0-748" name="__codelineno-0-748"></a>            <span class="n">per</span><span class="p">[</span><span class="n">fb</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
-<a id="__codelineno-0-749" name="__codelineno-0-749"></a>            <span class="k">continue</span>
-<a id="__codelineno-0-750" name="__codelineno-0-750"></a>        <span class="n">ok</span> <span class="o">=</span> <span class="n">_attempt</span><span class="p">(</span><span class="n">fb</span><span class="p">)</span>
-<a id="__codelineno-0-751" name="__codelineno-0-751"></a>        <span class="n">per</span><span class="p">[</span><span class="n">fb</span><span class="p">]</span> <span class="o">=</span> <span class="n">ok</span>
-<a id="__codelineno-0-752" name="__codelineno-0-752"></a>        <span class="k">if</span> <span class="n">ok</span><span class="p">:</span>
-<a id="__codelineno-0-753" name="__codelineno-0-753"></a>            <span class="n">successes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fb</span><span class="p">)</span>
-<a id="__codelineno-0-754" name="__codelineno-0-754"></a>            <span class="k">if</span> <span class="ow">not</span> <span class="n">first_saved</span><span class="p">:</span>
-<a id="__codelineno-0-755" name="__codelineno-0-755"></a>                <span class="n">first_saved</span> <span class="o">=</span> <span class="n">fb</span>
-<a id="__codelineno-0-756" name="__codelineno-0-756"></a>            <span class="k">if</span> <span class="n">save_first_only</span><span class="p">:</span>
-<a id="__codelineno-0-757" name="__codelineno-0-757"></a>                <span class="c1"># stop after the first saved to limit writes</span>
-<a id="__codelineno-0-758" name="__codelineno-0-758"></a>                <span class="k">break</span>
-<a id="__codelineno-0-759" name="__codelineno-0-759"></a>
-<a id="__codelineno-0-760" name="__codelineno-0-760"></a>    <span class="k">return</span> <span class="p">{</span>
-<a id="__codelineno-0-761" name="__codelineno-0-761"></a>        <span class="s2">&quot;direct&quot;</span><span class="p">:</span> <span class="n">per</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
-<a id="__codelineno-0-762" name="__codelineno-0-762"></a>        <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">per</span><span class="p">,</span>
-<a id="__codelineno-0-763" name="__codelineno-0-763"></a>        <span class="s2">&quot;successes&quot;</span><span class="p">:</span> <span class="n">successes</span><span class="p">,</span>
-<a id="__codelineno-0-764" name="__codelineno-0-764"></a>        <span class="s2">&quot;first_saved&quot;</span><span class="p">:</span> <span class="n">first_saved</span><span class="p">,</span>
-<a id="__codelineno-0-765" name="__codelineno-0-765"></a>    <span class="p">}</span>
+<a id="__codelineno-0-689" name="__codelineno-0-689"></a>    <span class="c1"># Use a unique path for the initial direct check so save_pdf doesn&#39;t</span>
+<a id="__codelineno-0-690" name="__codelineno-0-690"></a>    <span class="c1"># already save a fallback to the main output and interfere with later attempts.</span>
+<a id="__codelineno-0-691" name="__codelineno-0-691"></a>    <span class="n">direct_check_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">base_output</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;.direct_check&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-692" name="__codelineno-0-692"></a>    <span class="n">direct_res</span> <span class="o">=</span> <span class="n">save_pdf</span><span class="p">(</span>
+<a id="__codelineno-0-693" name="__codelineno-0-693"></a>        <span class="n">paper_metadata</span><span class="p">,</span>
+<a id="__codelineno-0-694" name="__codelineno-0-694"></a>        <span class="n">direct_check_path</span><span class="p">,</span>
+<a id="__codelineno-0-695" name="__codelineno-0-695"></a>        <span class="n">save_metadata</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-0-696" name="__codelineno-0-696"></a>        <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
+<a id="__codelineno-0-697" name="__codelineno-0-697"></a>        <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span><span class="p">,</span>
+<a id="__codelineno-0-698" name="__codelineno-0-698"></a>        <span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">,</span>
+<a id="__codelineno-0-699" name="__codelineno-0-699"></a>    <span class="p">)</span>
+<a id="__codelineno-0-700" name="__codelineno-0-700"></a>
+<a id="__codelineno-0-701" name="__codelineno-0-701"></a>    <span class="c1"># Only treat &quot;direct&quot; as successful if the returned method is actually &quot;direct&quot;</span>
+<a id="__codelineno-0-702" name="__codelineno-0-702"></a>    <span class="n">is_direct</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">direct_res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;success&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">direct_res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;direct&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-703" name="__codelineno-0-703"></a>    <span class="k">if</span> <span class="n">is_direct</span><span class="p">:</span>
+<a id="__codelineno-0-704" name="__codelineno-0-704"></a>        <span class="n">successes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-705" name="__codelineno-0-705"></a>    <span class="n">per</span><span class="p">[</span><span class="s2">&quot;direct&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_direct</span>
+<a id="__codelineno-0-706" name="__codelineno-0-706"></a>    <span class="n">first_saved</span> <span class="o">=</span> <span class="s2">&quot;direct&quot;</span> <span class="k">if</span> <span class="n">per</span><span class="p">[</span><span class="s2">&quot;direct&quot;</span><span class="p">]</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-707" name="__codelineno-0-707"></a>
+<a id="__codelineno-0-708" name="__codelineno-0-708"></a>    <span class="c1"># Build a deterministic list of fallbacks</span>
+<a id="__codelineno-0-709" name="__codelineno-0-709"></a>    <span class="n">order</span> <span class="o">=</span> <span class="p">[</span>
+<a id="__codelineno-0-710" name="__codelineno-0-710"></a>        <span class="s2">&quot;unpaywall&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-711" name="__codelineno-0-711"></a>        <span class="s2">&quot;europepmc&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-712" name="__codelineno-0-712"></a>        <span class="s2">&quot;bioc_pmc&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-713" name="__codelineno-0-713"></a>        <span class="s2">&quot;plos&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-714" name="__codelineno-0-714"></a>        <span class="s2">&quot;elife&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-715" name="__codelineno-0-715"></a>        <span class="s2">&quot;openalex&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-716" name="__codelineno-0-716"></a>        <span class="s2">&quot;crossref&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-717" name="__codelineno-0-717"></a>        <span class="s2">&quot;doaj&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-718" name="__codelineno-0-718"></a>        <span class="s2">&quot;arxiv&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-719" name="__codelineno-0-719"></a>        <span class="s2">&quot;springer&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-720" name="__codelineno-0-720"></a>        <span class="s2">&quot;wiley&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-721" name="__codelineno-0-721"></a>        <span class="s2">&quot;elsevier&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-722" name="__codelineno-0-722"></a>    <span class="p">]</span>
+<a id="__codelineno-0-723" name="__codelineno-0-723"></a>
+<a id="__codelineno-0-724" name="__codelineno-0-724"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_attempt</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-0-725" name="__codelineno-0-725"></a>        <span class="c1"># derive unique output stem for debug</span>
+<a id="__codelineno-0-726" name="__codelineno-0-726"></a>        <span class="n">out</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">base_output</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;.</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-727" name="__codelineno-0-727"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-728" name="__codelineno-0-728"></a>            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;unpaywall&quot;</span> <span class="ow">and</span> <span class="n">mail</span><span class="p">:</span>
+<a id="__codelineno-0-729" name="__codelineno-0-729"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">mail</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<a id="__codelineno-0-730" name="__codelineno-0-730"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;europepmc&quot;</span><span class="p">,</span> <span class="s2">&quot;doaj&quot;</span><span class="p">,</span> <span class="s2">&quot;openalex&quot;</span><span class="p">,</span> <span class="s2">&quot;arxiv&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-731" name="__codelineno-0-731"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+<a id="__codelineno-0-732" name="__codelineno-0-732"></a>            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;crossref&quot;</span><span class="p">:</span>
+<a id="__codelineno-0-733" name="__codelineno-0-733"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">mail</span> <span class="ow">or</span> <span class="s2">&quot;your_email@example.com&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-734" name="__codelineno-0-734"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;s3&quot;</span><span class="p">,</span> <span class="s2">&quot;medrxiv_s3&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-735" name="__codelineno-0-735"></a>                <span class="k">if</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;AWS_ACCESS_KEY_ID&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+<a id="__codelineno-0-736" name="__codelineno-0-736"></a>                    <span class="s2">&quot;AWS_SECRET_ACCESS_KEY&quot;</span>
+<a id="__codelineno-0-737" name="__codelineno-0-737"></a>                <span class="p">):</span>
+<a id="__codelineno-0-738" name="__codelineno-0-738"></a>                    <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">api_keys</span><span class="p">)</span>
+<a id="__codelineno-0-739" name="__codelineno-0-739"></a>                <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-740" name="__codelineno-0-740"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;plos&quot;</span><span class="p">,</span> <span class="s2">&quot;elife&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-741" name="__codelineno-0-741"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">doi</span><span class="p">,</span> <span class="n">out</span><span class="p">)</span>
+<a id="__codelineno-0-742" name="__codelineno-0-742"></a>            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;wiley&quot;</span><span class="p">,</span> <span class="s2">&quot;springer&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-743" name="__codelineno-0-743"></a>                <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;wiley&quot;</span><span class="p">:</span>
+<a id="__codelineno-0-744" name="__codelineno-0-744"></a>                    <span class="k">if</span> <span class="ow">not</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;WILEY_TDM_API_TOKEN&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-745" name="__codelineno-0-745"></a>                        <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-746" name="__codelineno-0-746"></a>                    <span class="c1"># Only try Wiley when applicable</span>
+<a id="__codelineno-0-747" name="__codelineno-0-747"></a>                    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-748" name="__codelineno-0-748"></a>                        <span class="k">if</span> <span class="ow">not</span> <span class="n">_wiley_allowed</span><span class="p">(</span><span class="n">doi</span><span class="p">):</span>
+<a id="__codelineno-0-749" name="__codelineno-0-749"></a>                            <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-750" name="__codelineno-0-750"></a>                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+<a id="__codelineno-0-751" name="__codelineno-0-751"></a>                        <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-752" name="__codelineno-0-752"></a>                <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;springer&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SPRINGER_API_KEY&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-753" name="__codelineno-0-753"></a>                    <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-754" name="__codelineno-0-754"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="n">paper_metadata</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">api_keys</span><span class="p">)</span>
+<a id="__codelineno-0-755" name="__codelineno-0-755"></a>            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;elsevier&quot;</span><span class="p">:</span>
+<a id="__codelineno-0-756" name="__codelineno-0-756"></a>                <span class="k">if</span> <span class="ow">not</span> <span class="n">api_keys</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ELSEVIER_TDM_API_KEY&quot;</span><span class="p">):</span>
+<a id="__codelineno-0-757" name="__codelineno-0-757"></a>                    <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-758" name="__codelineno-0-758"></a>                <span class="k">return</span> <span class="n">FALLBACKS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span>
+<a id="__codelineno-0-759" name="__codelineno-0-759"></a>                    <span class="n">paper_metadata</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">api_keys</span><span class="p">,</span> <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span>
+<a id="__codelineno-0-760" name="__codelineno-0-760"></a>                <span class="p">)</span>
+<a id="__codelineno-0-761" name="__codelineno-0-761"></a>        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+<a id="__codelineno-0-762" name="__codelineno-0-762"></a>            <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-763" name="__codelineno-0-763"></a>        <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-764" name="__codelineno-0-764"></a>
+<a id="__codelineno-0-765" name="__codelineno-0-765"></a>    <span class="k">for</span> <span class="n">fb</span> <span class="ow">in</span> <span class="n">order</span><span class="p">:</span>
+<a id="__codelineno-0-766" name="__codelineno-0-766"></a>        <span class="k">if</span> <span class="n">fb</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">FALLBACKS</span><span class="p">:</span>
+<a id="__codelineno-0-767" name="__codelineno-0-767"></a>            <span class="n">per</span><span class="p">[</span><span class="n">fb</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-0-768" name="__codelineno-0-768"></a>            <span class="k">continue</span>
+<a id="__codelineno-0-769" name="__codelineno-0-769"></a>        <span class="n">ok</span> <span class="o">=</span> <span class="n">_attempt</span><span class="p">(</span><span class="n">fb</span><span class="p">)</span>
+<a id="__codelineno-0-770" name="__codelineno-0-770"></a>        <span class="n">per</span><span class="p">[</span><span class="n">fb</span><span class="p">]</span> <span class="o">=</span> <span class="n">ok</span>
+<a id="__codelineno-0-771" name="__codelineno-0-771"></a>        <span class="k">if</span> <span class="n">ok</span><span class="p">:</span>
+<a id="__codelineno-0-772" name="__codelineno-0-772"></a>            <span class="n">successes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fb</span><span class="p">)</span>
+<a id="__codelineno-0-773" name="__codelineno-0-773"></a>            <span class="k">if</span> <span class="ow">not</span> <span class="n">first_saved</span><span class="p">:</span>
+<a id="__codelineno-0-774" name="__codelineno-0-774"></a>                <span class="n">first_saved</span> <span class="o">=</span> <span class="n">fb</span>
+<a id="__codelineno-0-775" name="__codelineno-0-775"></a>            <span class="k">if</span> <span class="n">save_first_only</span><span class="p">:</span>
+<a id="__codelineno-0-776" name="__codelineno-0-776"></a>                <span class="c1"># stop after the first saved to limit writes</span>
+<a id="__codelineno-0-777" name="__codelineno-0-777"></a>                <span class="k">break</span>
+<a id="__codelineno-0-778" name="__codelineno-0-778"></a>
+<a id="__codelineno-0-779" name="__codelineno-0-779"></a>    <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-0-780" name="__codelineno-0-780"></a>        <span class="s2">&quot;direct&quot;</span><span class="p">:</span> <span class="n">per</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+<a id="__codelineno-0-781" name="__codelineno-0-781"></a>        <span class="s2">&quot;results&quot;</span><span class="p">:</span> <span class="n">per</span><span class="p">,</span>
+<a id="__codelineno-0-782" name="__codelineno-0-782"></a>        <span class="s2">&quot;successes&quot;</span><span class="p">:</span> <span class="n">successes</span><span class="p">,</span>
+<a id="__codelineno-0-783" name="__codelineno-0-783"></a>        <span class="s2">&quot;first_saved&quot;</span><span class="p">:</span> <span class="n">first_saved</span><span class="p">,</span>
+<a id="__codelineno-0-784" name="__codelineno-0-784"></a>    <span class="p">}</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6490,26 +6536,7 @@ Saves intermediate stats every <code>save_interval</code> papers so partial resu
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>paperscraper/pdf/pdf.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-769">769</a></span>
-<span class="normal"><a href="#__codelineno-0-770">770</a></span>
-<span class="normal"><a href="#__codelineno-0-771">771</a></span>
-<span class="normal"><a href="#__codelineno-0-772">772</a></span>
-<span class="normal"><a href="#__codelineno-0-773">773</a></span>
-<span class="normal"><a href="#__codelineno-0-774">774</a></span>
-<span class="normal"><a href="#__codelineno-0-775">775</a></span>
-<span class="normal"><a href="#__codelineno-0-776">776</a></span>
-<span class="normal"><a href="#__codelineno-0-777">777</a></span>
-<span class="normal"><a href="#__codelineno-0-778">778</a></span>
-<span class="normal"><a href="#__codelineno-0-779">779</a></span>
-<span class="normal"><a href="#__codelineno-0-780">780</a></span>
-<span class="normal"><a href="#__codelineno-0-781">781</a></span>
-<span class="normal"><a href="#__codelineno-0-782">782</a></span>
-<span class="normal"><a href="#__codelineno-0-783">783</a></span>
-<span class="normal"><a href="#__codelineno-0-784">784</a></span>
-<span class="normal"><a href="#__codelineno-0-785">785</a></span>
-<span class="normal"><a href="#__codelineno-0-786">786</a></span>
-<span class="normal"><a href="#__codelineno-0-787">787</a></span>
-<span class="normal"><a href="#__codelineno-0-788">788</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-788">788</a></span>
 <span class="normal"><a href="#__codelineno-0-789">789</a></span>
 <span class="normal"><a href="#__codelineno-0-790">790</a></span>
 <span class="normal"><a href="#__codelineno-0-791">791</a></span>
@@ -6559,76 +6586,95 @@ Saves intermediate stats every <code>save_interval</code> papers so partial resu
 <span class="normal"><a href="#__codelineno-0-835">835</a></span>
 <span class="normal"><a href="#__codelineno-0-836">836</a></span>
 <span class="normal"><a href="#__codelineno-0-837">837</a></span>
-<span class="normal"><a href="#__codelineno-0-838">838</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-769" name="__codelineno-0-769"></a><span class="k">def</span><span class="w"> </span><span class="nf">debug_save_pdf_from_dump</span><span class="p">(</span>
-<a id="__codelineno-0-770" name="__codelineno-0-770"></a>    <span class="n">dump_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-0-771" name="__codelineno-0-771"></a>    <span class="n">pdf_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-<a id="__codelineno-0-772" name="__codelineno-0-772"></a>    <span class="n">api_keys</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-773" name="__codelineno-0-773"></a>    <span class="n">preferred_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pdf&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-774" name="__codelineno-0-774"></a>    <span class="n">mail</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-775" name="__codelineno-0-775"></a>    <span class="n">save_first_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-776" name="__codelineno-0-776"></a>    <span class="n">save_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
-<a id="__codelineno-0-777" name="__codelineno-0-777"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-778" name="__codelineno-0-778"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<a id="__codelineno-0-779" name="__codelineno-0-779"></a><span class="sd">    Debug variant for batch processing that tests all fallbacks per paper and records which work.</span>
-<a id="__codelineno-0-780" name="__codelineno-0-780"></a><span class="sd">    Writes a debug_fallback_stats.json with detailed per-DOI outcomes.</span>
-<a id="__codelineno-0-781" name="__codelineno-0-781"></a><span class="sd">    Saves intermediate stats every `save_interval` papers so partial results are available.</span>
-<a id="__codelineno-0-782" name="__codelineno-0-782"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-783" name="__codelineno-0-783"></a>    <span class="n">papers</span> <span class="o">=</span> <span class="n">load_jsonl</span><span class="p">(</span><span class="n">dump_path</span><span class="p">)</span>
-<a id="__codelineno-0-784" name="__codelineno-0-784"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">api_keys</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-<a id="__codelineno-0-785" name="__codelineno-0-785"></a>        <span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="n">api_keys</span><span class="p">)</span>
-<a id="__codelineno-0-786" name="__codelineno-0-786"></a>
-<a id="__codelineno-0-787" name="__codelineno-0-787"></a>    <span class="n">by_doi</span> <span class="o">=</span> <span class="p">{}</span>
-<a id="__codelineno-0-788" name="__codelineno-0-788"></a>    <span class="n">counts</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-<a id="__codelineno-0-789" name="__codelineno-0-789"></a>
-<a id="__codelineno-0-790" name="__codelineno-0-790"></a>    <span class="n">pbar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">papers</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Debug processing&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-791" name="__codelineno-0-791"></a>
-<a id="__codelineno-0-792" name="__codelineno-0-792"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_write_debug_stats</span><span class="p">(</span>
-<a id="__codelineno-0-793" name="__codelineno-0-793"></a>        <span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">by_doi_obj</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">counts_obj</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
-<a id="__codelineno-0-794" name="__codelineno-0-794"></a>    <span class="p">):</span>
-<a id="__codelineno-0-795" name="__codelineno-0-795"></a>        <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-796" name="__codelineno-0-796"></a>            <span class="n">stats_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;debug_fallback_stats.json&quot;</span>
-<a id="__codelineno-0-797" name="__codelineno-0-797"></a>            <span class="n">tmp_path</span> <span class="o">=</span> <span class="n">stats_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.tmp&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-798" name="__codelineno-0-798"></a>            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-<a id="__codelineno-0-799" name="__codelineno-0-799"></a>                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span>
-<a id="__codelineno-0-800" name="__codelineno-0-800"></a>                    <span class="p">{</span><span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">by_doi_obj</span><span class="p">,</span> <span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts_obj</span><span class="p">},</span>
-<a id="__codelineno-0-801" name="__codelineno-0-801"></a>                    <span class="n">f</span><span class="p">,</span>
-<a id="__codelineno-0-802" name="__codelineno-0-802"></a>                    <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-<a id="__codelineno-0-803" name="__codelineno-0-803"></a>                    <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-<a id="__codelineno-0-804" name="__codelineno-0-804"></a>                <span class="p">)</span>
-<a id="__codelineno-0-805" name="__codelineno-0-805"></a>            <span class="n">tmp_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">stats_path</span><span class="p">)</span>
-<a id="__codelineno-0-806" name="__codelineno-0-806"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved debug fallback stats to </span><span class="si">{</span><span class="n">stats_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-807" name="__codelineno-0-807"></a>        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-808" name="__codelineno-0-808"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write debug fallback stats: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-809" name="__codelineno-0-809"></a>
-<a id="__codelineno-0-810" name="__codelineno-0-810"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">paper</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pbar</span><span class="p">):</span>
-<a id="__codelineno-0-811" name="__codelineno-0-811"></a>        <span class="k">if</span> <span class="s2">&quot;doi&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">paper</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]:</span>
-<a id="__codelineno-0-812" name="__codelineno-0-812"></a>            <span class="k">continue</span>
-<a id="__codelineno-0-813" name="__codelineno-0-813"></a>        <span class="n">filename</span> <span class="o">=</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-814" name="__codelineno-0-814"></a>        <span class="n">out</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.pdf&quot;</span><span class="p">)))</span>
-<a id="__codelineno-0-815" name="__codelineno-0-815"></a>        <span class="n">res</span> <span class="o">=</span> <span class="n">debug_save_pdf</span><span class="p">(</span>
-<a id="__codelineno-0-816" name="__codelineno-0-816"></a>            <span class="n">paper</span><span class="p">,</span>
-<a id="__codelineno-0-817" name="__codelineno-0-817"></a>            <span class="n">out</span><span class="p">,</span>
-<a id="__codelineno-0-818" name="__codelineno-0-818"></a>            <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
-<a id="__codelineno-0-819" name="__codelineno-0-819"></a>            <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span><span class="p">,</span>
-<a id="__codelineno-0-820" name="__codelineno-0-820"></a>            <span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">,</span>
-<a id="__codelineno-0-821" name="__codelineno-0-821"></a>            <span class="n">save_first_only</span><span class="o">=</span><span class="n">save_first_only</span><span class="p">,</span>
-<a id="__codelineno-0-822" name="__codelineno-0-822"></a>        <span class="p">)</span>
-<a id="__codelineno-0-823" name="__codelineno-0-823"></a>        <span class="n">by_doi</span><span class="p">[</span><span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">res</span>
-<a id="__codelineno-0-824" name="__codelineno-0-824"></a>        <span class="c1"># count successes per fallback</span>
-<a id="__codelineno-0-825" name="__codelineno-0-825"></a>        <span class="k">for</span> <span class="n">fb</span><span class="p">,</span> <span class="n">ok</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;results&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-<a id="__codelineno-0-826" name="__codelineno-0-826"></a>            <span class="k">if</span> <span class="n">ok</span><span class="p">:</span>
-<a id="__codelineno-0-827" name="__codelineno-0-827"></a>                <span class="n">counts</span><span class="p">[</span><span class="n">fb</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">fb</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<span class="normal"><a href="#__codelineno-0-838">838</a></span>
+<span class="normal"><a href="#__codelineno-0-839">839</a></span>
+<span class="normal"><a href="#__codelineno-0-840">840</a></span>
+<span class="normal"><a href="#__codelineno-0-841">841</a></span>
+<span class="normal"><a href="#__codelineno-0-842">842</a></span>
+<span class="normal"><a href="#__codelineno-0-843">843</a></span>
+<span class="normal"><a href="#__codelineno-0-844">844</a></span>
+<span class="normal"><a href="#__codelineno-0-845">845</a></span>
+<span class="normal"><a href="#__codelineno-0-846">846</a></span>
+<span class="normal"><a href="#__codelineno-0-847">847</a></span>
+<span class="normal"><a href="#__codelineno-0-848">848</a></span>
+<span class="normal"><a href="#__codelineno-0-849">849</a></span>
+<span class="normal"><a href="#__codelineno-0-850">850</a></span>
+<span class="normal"><a href="#__codelineno-0-851">851</a></span>
+<span class="normal"><a href="#__codelineno-0-852">852</a></span>
+<span class="normal"><a href="#__codelineno-0-853">853</a></span>
+<span class="normal"><a href="#__codelineno-0-854">854</a></span>
+<span class="normal"><a href="#__codelineno-0-855">855</a></span>
+<span class="normal"><a href="#__codelineno-0-856">856</a></span>
+<span class="normal"><a href="#__codelineno-0-857">857</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-788" name="__codelineno-0-788"></a><span class="k">def</span><span class="w"> </span><span class="nf">debug_save_pdf_from_dump</span><span class="p">(</span>
+<a id="__codelineno-0-789" name="__codelineno-0-789"></a>    <span class="n">dump_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-0-790" name="__codelineno-0-790"></a>    <span class="n">pdf_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-0-791" name="__codelineno-0-791"></a>    <span class="n">api_keys</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-792" name="__codelineno-0-792"></a>    <span class="n">preferred_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pdf&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-793" name="__codelineno-0-793"></a>    <span class="n">mail</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-794" name="__codelineno-0-794"></a>    <span class="n">save_first_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-0-795" name="__codelineno-0-795"></a>    <span class="n">save_interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-0-796" name="__codelineno-0-796"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-797" name="__codelineno-0-797"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<a id="__codelineno-0-798" name="__codelineno-0-798"></a><span class="sd">    Debug variant for batch processing that tests all fallbacks per paper and records which work.</span>
+<a id="__codelineno-0-799" name="__codelineno-0-799"></a><span class="sd">    Writes a debug_fallback_stats.json with detailed per-DOI outcomes.</span>
+<a id="__codelineno-0-800" name="__codelineno-0-800"></a><span class="sd">    Saves intermediate stats every `save_interval` papers so partial results are available.</span>
+<a id="__codelineno-0-801" name="__codelineno-0-801"></a><span class="sd">    &quot;&quot;&quot;</span>
+<a id="__codelineno-0-802" name="__codelineno-0-802"></a>    <span class="n">papers</span> <span class="o">=</span> <span class="n">load_papers_dump</span><span class="p">(</span><span class="n">dump_path</span><span class="p">)</span>
+<a id="__codelineno-0-803" name="__codelineno-0-803"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">api_keys</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+<a id="__codelineno-0-804" name="__codelineno-0-804"></a>        <span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="n">api_keys</span><span class="p">)</span>
+<a id="__codelineno-0-805" name="__codelineno-0-805"></a>
+<a id="__codelineno-0-806" name="__codelineno-0-806"></a>    <span class="n">by_doi</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-0-807" name="__codelineno-0-807"></a>    <span class="n">counts</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<a id="__codelineno-0-808" name="__codelineno-0-808"></a>
+<a id="__codelineno-0-809" name="__codelineno-0-809"></a>    <span class="n">pbar</span> <span class="o">=</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">papers</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">papers</span><span class="p">),</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Debug processing&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-810" name="__codelineno-0-810"></a>
+<a id="__codelineno-0-811" name="__codelineno-0-811"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_write_debug_stats</span><span class="p">(</span>
+<a id="__codelineno-0-812" name="__codelineno-0-812"></a>        <span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">by_doi_obj</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">counts_obj</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+<a id="__codelineno-0-813" name="__codelineno-0-813"></a>    <span class="p">):</span>
+<a id="__codelineno-0-814" name="__codelineno-0-814"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-815" name="__codelineno-0-815"></a>            <span class="n">stats_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;debug_fallback_stats.json&quot;</span>
+<a id="__codelineno-0-816" name="__codelineno-0-816"></a>            <span class="n">tmp_path</span> <span class="o">=</span> <span class="n">stats_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">&quot;.tmp&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-817" name="__codelineno-0-817"></a>            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">tmp_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<a id="__codelineno-0-818" name="__codelineno-0-818"></a>                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span>
+<a id="__codelineno-0-819" name="__codelineno-0-819"></a>                    <span class="p">{</span><span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">by_doi_obj</span><span class="p">,</span> <span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts_obj</span><span class="p">},</span>
+<a id="__codelineno-0-820" name="__codelineno-0-820"></a>                    <span class="n">f</span><span class="p">,</span>
+<a id="__codelineno-0-821" name="__codelineno-0-821"></a>                    <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-0-822" name="__codelineno-0-822"></a>                    <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-0-823" name="__codelineno-0-823"></a>                <span class="p">)</span>
+<a id="__codelineno-0-824" name="__codelineno-0-824"></a>            <span class="n">tmp_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">stats_path</span><span class="p">)</span>
+<a id="__codelineno-0-825" name="__codelineno-0-825"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved debug fallback stats to </span><span class="si">{</span><span class="n">stats_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-826" name="__codelineno-0-826"></a>        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-827" name="__codelineno-0-827"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write debug fallback stats: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <a id="__codelineno-0-828" name="__codelineno-0-828"></a>
-<a id="__codelineno-0-829" name="__codelineno-0-829"></a>        <span class="c1"># periodically save partial stats so you can inspect mid-run</span>
-<a id="__codelineno-0-830" name="__codelineno-0-830"></a>        <span class="k">if</span> <span class="n">save_interval</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="p">((</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">save_interval</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
-<a id="__codelineno-0-831" name="__codelineno-0-831"></a>            <span class="n">_write_debug_stats</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="n">by_doi</span><span class="p">,</span> <span class="n">counts</span><span class="p">)</span>
-<a id="__codelineno-0-832" name="__codelineno-0-832"></a>
-<a id="__codelineno-0-833" name="__codelineno-0-833"></a>    <span class="c1"># write final debug stats</span>
-<a id="__codelineno-0-834" name="__codelineno-0-834"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-835" name="__codelineno-0-835"></a>        <span class="n">_write_debug_stats</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="n">by_doi</span><span class="p">,</span> <span class="n">counts</span><span class="p">)</span>
-<a id="__codelineno-0-836" name="__codelineno-0-836"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-837" name="__codelineno-0-837"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write final debug fallback stats: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-838" name="__codelineno-0-838"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">by_doi</span><span class="p">,</span> <span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts</span><span class="p">}</span>
+<a id="__codelineno-0-829" name="__codelineno-0-829"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">paper</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pbar</span><span class="p">):</span>
+<a id="__codelineno-0-830" name="__codelineno-0-830"></a>        <span class="k">if</span> <span class="s2">&quot;doi&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">paper</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-831" name="__codelineno-0-831"></a>            <span class="k">continue</span>
+<a id="__codelineno-0-832" name="__codelineno-0-832"></a>        <span class="n">filename</span> <span class="o">=</span> <span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-833" name="__codelineno-0-833"></a>        <span class="n">out</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">.pdf&quot;</span><span class="p">)))</span>
+<a id="__codelineno-0-834" name="__codelineno-0-834"></a>        <span class="n">res</span> <span class="o">=</span> <span class="n">debug_save_pdf</span><span class="p">(</span>
+<a id="__codelineno-0-835" name="__codelineno-0-835"></a>            <span class="n">paper</span><span class="p">,</span>
+<a id="__codelineno-0-836" name="__codelineno-0-836"></a>            <span class="n">out</span><span class="p">,</span>
+<a id="__codelineno-0-837" name="__codelineno-0-837"></a>            <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
+<a id="__codelineno-0-838" name="__codelineno-0-838"></a>            <span class="n">preferred_type</span><span class="o">=</span><span class="n">preferred_type</span><span class="p">,</span>
+<a id="__codelineno-0-839" name="__codelineno-0-839"></a>            <span class="n">mail</span><span class="o">=</span><span class="n">mail</span><span class="p">,</span>
+<a id="__codelineno-0-840" name="__codelineno-0-840"></a>            <span class="n">save_first_only</span><span class="o">=</span><span class="n">save_first_only</span><span class="p">,</span>
+<a id="__codelineno-0-841" name="__codelineno-0-841"></a>        <span class="p">)</span>
+<a id="__codelineno-0-842" name="__codelineno-0-842"></a>        <span class="n">by_doi</span><span class="p">[</span><span class="n">paper</span><span class="p">[</span><span class="s2">&quot;doi&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">res</span>
+<a id="__codelineno-0-843" name="__codelineno-0-843"></a>        <span class="c1"># count successes per fallback</span>
+<a id="__codelineno-0-844" name="__codelineno-0-844"></a>        <span class="k">for</span> <span class="n">fb</span><span class="p">,</span> <span class="n">ok</span> <span class="ow">in</span> <span class="n">res</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;results&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a id="__codelineno-0-845" name="__codelineno-0-845"></a>            <span class="k">if</span> <span class="n">ok</span><span class="p">:</span>
+<a id="__codelineno-0-846" name="__codelineno-0-846"></a>                <span class="n">counts</span><span class="p">[</span><span class="n">fb</span><span class="p">]</span> <span class="o">=</span> <span class="n">counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">fb</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-847" name="__codelineno-0-847"></a>
+<a id="__codelineno-0-848" name="__codelineno-0-848"></a>        <span class="c1"># periodically save partial stats so you can inspect mid-run</span>
+<a id="__codelineno-0-849" name="__codelineno-0-849"></a>        <span class="k">if</span> <span class="n">save_interval</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="p">((</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">save_interval</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+<a id="__codelineno-0-850" name="__codelineno-0-850"></a>            <span class="n">_write_debug_stats</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="n">by_doi</span><span class="p">,</span> <span class="n">counts</span><span class="p">)</span>
+<a id="__codelineno-0-851" name="__codelineno-0-851"></a>
+<a id="__codelineno-0-852" name="__codelineno-0-852"></a>    <span class="c1"># write final debug stats</span>
+<a id="__codelineno-0-853" name="__codelineno-0-853"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-854" name="__codelineno-0-854"></a>        <span class="n">_write_debug_stats</span><span class="p">(</span><span class="n">pdf_path</span><span class="p">,</span> <span class="n">by_doi</span><span class="p">,</span> <span class="n">counts</span><span class="p">)</span>
+<a id="__codelineno-0-855" name="__codelineno-0-855"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-856" name="__codelineno-0-856"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write final debug fallback stats: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-857" name="__codelineno-0-857"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;by_doi&quot;</span><span class="p">:</span> <span class="n">by_doi</span><span class="p">,</span> <span class="s2">&quot;counts&quot;</span><span class="p">:</span> <span class="n">counts</span><span class="p">}</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
