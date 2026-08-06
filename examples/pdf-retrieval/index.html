@@ -1089,22 +1089,22 @@ most reliable targets; journal papers can depend on open-access status,
 publisher pages, and institutional/API access.</p>
 <h2 id="single-doi">Single DOI<a class="headerlink" href="#single-doi" title="Permanent link">&para;</a></h2>
 <p>Download a single paper by DOI:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_pdf</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_file</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">paper</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;doi&quot;</span><span class="p">:</span> <span class="s2">&quot;10.48550/arXiv.2207.03928&quot;</span><span class="p">}</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">save_pdf</span><span class="p">(</span><span class="n">paper</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;gt4sd_paper.pdf&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">save_file</span><span class="p">(</span><span class="n">paper</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;gt4sd_paper.pdf&quot;</span><span class="p">)</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go">True</span>
 </code></pre></div>
 <p><code>filepath</code> can be provided with or without <code>.pdf</code>. XML fallbacks write an <code>.xml</code>
 file next to the requested path when XML full text is the available format.</p>
 <p>Pass <code>save_metadata=True</code> to store paper metadata next to the downloaded file:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">save_pdf</span><span class="p">(</span><span class="n">paper</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;gt4sd_paper.pdf&quot;</span><span class="p">,</span> <span class="n">save_metadata</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">save_file</span><span class="p">(</span><span class="n">paper</span><span class="p">,</span> <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;gt4sd_paper.pdf&quot;</span><span class="p">,</span> <span class="n">save_metadata</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="go">True</span>
 </code></pre></div>
 <h2 id="batch-downloads">Batch Downloads<a class="headerlink" href="#batch-downloads" title="Permanent link">&para;</a></h2>
 <p>Download PDFs or XMLs from a metadata dump:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_pdf_from_dump</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_file_from_dump</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">save_pdf_from_dump</span><span class="p">(</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">save_file_from_dump</span><span class="p">(</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">&quot;ai_quantum_chemistry.jsonl&quot;</span><span class="p">,</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">pdf_path</span><span class="o">=</span><span class="s2">&quot;papers&quot;</span><span class="p">,</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">key_to_save</span><span class="o">=</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span>
@@ -1112,11 +1112,11 @@ file next to the requested path when XML full text is the available format.</p>
 </code></pre></div>
 <p><code>key_to_save</code> can be <code>"doi"</code>, <code>"title"</code>, or <code>"date"</code>.</p>
 <h3 id="web-of-science-tab-delimited-exports">Web of Science tab-delimited exports<a class="headerlink" href="#web-of-science-tab-delimited-exports" title="Permanent link">&para;</a></h3>
-<p><code>save_pdf_from_dump</code> also accepts Web of Science <strong>Tab-delimited (Win, UTF-8)</strong>
+<p><code>save_file_from_dump</code> also accepts Web of Science <strong>Tab-delimited (Win, UTF-8)</strong>
 exports (usually named <code>savedrecs.txt</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_pdf_from_dump</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_file_from_dump</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">save_pdf_from_dump</span><span class="p">(</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">save_file_from_dump</span><span class="p">(</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">&quot;savedrecs.txt&quot;</span><span class="p">,</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">pdf_path</span><span class="o">=</span><span class="s2">&quot;wos_pdfs&quot;</span><span class="p">,</span>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">key_to_save</span><span class="o">=</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span>
@@ -1132,7 +1132,7 @@ loader maps WoS tags such as <code>DI</code>→<code>doi</code>, <code>TI</code>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">wos_tba_to_jsonl</span><span class="p">(</span><span class="s2">&quot;savedrecs.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;savedrecs.jsonl&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>To download <strong>both PDF and XML</strong> when available:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">save_pdf_from_dump</span><span class="p">(</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">save_file_from_dump</span><span class="p">(</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">&quot;ai_quantum_chemistry.jsonl&quot;</span><span class="p">,</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">pdf_path</span><span class="o">=</span><span class="s2">&quot;papers&quot;</span><span class="p">,</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">key_to_save</span><span class="o">=</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span>
@@ -1141,9 +1141,9 @@ loader maps WoS tags such as <code>DI</code>→<code>doi</code>, <code>TI</code>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span>
 </code></pre></div>
 <p>Or for a single paper:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_pdf_and_xml</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_file_and_xml</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">save_pdf_and_xml</span><span class="p">(</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">save_file_and_xml</span><span class="p">(</span>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="p">{</span><span class="s2">&quot;doi&quot;</span><span class="p">:</span> <span class="s2">&quot;10.1038/s41598-023-32245-9&quot;</span><span class="p">},</span>
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;paper&quot;</span><span class="p">,</span>
 <a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">mail</span><span class="o">=</span><span class="s2">&quot;you@institution.edu&quot;</span><span class="p">,</span>
@@ -1152,6 +1152,7 @@ loader maps WoS tags such as <code>DI</code>→<code>doi</code>, <code>TI</code>
 <h2 id="fallbacks">Fallbacks<a class="headerlink" href="#fallbacks" title="Permanent link">&para;</a></h2>
 <p>When direct PDF retrieval fails, <code>paperscraper</code> tries supported fallbacks:</p>
 <ul>
+<li>Europe PMC: OA PDF when available, otherwise full-text XML.</li>
 <li>BioC-PMC XML for open-access papers in PubMed Central.</li>
 <li>eLife XML from the eLife article XML repository.</li>
 <li>Publisher APIs when matching credentials are available.</li>
@@ -1169,7 +1170,7 @@ or paywalls.</p>
 <a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
 </code></pre></div>
 <p>Then pass the path when downloading from a dump:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">save_pdf_from_dump</span><span class="p">(</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">save_file_from_dump</span><span class="p">(</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="s2">&quot;pubmed_query_results.jsonl&quot;</span><span class="p">,</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">pdf_path</span><span class="o">=</span><span class="s2">&quot;papers&quot;</span><span class="p">,</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">key_to_save</span><span class="o">=</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span>
@@ -1177,10 +1178,10 @@ or paywalls.</p>
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">)</span>
 </code></pre></div>
 <p>Or load the keys once and reuse them across calls:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_api_keys</span><span class="p">,</span> <span class="n">save_pdf</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_api_keys</span><span class="p">,</span> <span class="n">save_file</span>
 <a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="s2">&quot;api_keys.txt&quot;</span><span class="p">)</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">save_pdf</span><span class="p">(</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">save_file</span><span class="p">(</span>
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="p">{</span><span class="s2">&quot;doi&quot;</span><span class="p">:</span> <span class="s2">&quot;10.1101/786871&quot;</span><span class="p">},</span>
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;taskload.pdf&quot;</span><span class="p">,</span>
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
