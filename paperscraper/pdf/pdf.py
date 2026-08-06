@@ -340,7 +340,12 @@ def save_pdf(
         return {"success": True, "method": "unpaywall", "filetype": "pdf"}
 
     if FALLBACKS["europepmc"](doi, output_path):
-        return {"success": True, "method": "europepmc", "filetype": "xml"}
+        filetype = (
+            "pdf"
+            if Path(output_path).with_suffix(".pdf").exists()
+            else "xml"
+        )
+        return {"success": True, "method": "europepmc", "filetype": filetype}
 
     if FALLBACKS["bioc_pmc"](doi, output_path, mail or "your_email@example.com"):
         return {"success": True, "method": "bioc_pmc", "filetype": "xml"}
@@ -708,6 +713,8 @@ def debug_save_pdf(
         try:
             if name == "unpaywall" and mail:
                 return FALLBACKS[name](doi, out, mail, None)
+            if name == "bioc_pmc":
+                return FALLBACKS[name](doi, out, mail or "your_email@example.com")
             if name in ("europepmc", "doaj", "openalex", "arxiv"):
                 return FALLBACKS[name](doi, out)
             if name == "crossref":

@@ -942,20 +942,21 @@ def fallback_plos_api(doi: str, output_path: Path) -> bool:
 
 def fallback_europepmc(doi: str, output_path: Path) -> bool:
     """
-    Attempt to download the XML via Europe PMC.
+    Attempt to download full text via Europe PMC.
 
-    This function first converts a given DOI to a PMCID using the Europe PMC REST API.
-    If a PMCID is found, it attempts to download the full-text XML from Europe PMC.
+    Resolves DOI -> PMCID via the Europe PMC REST search API, then tries:
+    1. Full-text XML (`.../fullTextXML`)
+    2. PDF render (`https://europepmc.org/articles/{pmcid}?pdf=render`)
 
-    Europe PMC is a repository of biomedical and life sciences literature that provides
-    free access to abstracts and full-text articles.
+    Many PMC author manuscripts (e.g. some PNAS papers) have a PDF but no
+    fullTextXML, so the PDF step recovers papers that XML-only misses.
 
     Args:
         doi (str): The DOI of the paper to retrieve.
-        output_path (Path): A pathlib.Path object representing the path where the XML file will be saved.
+        output_path (Path): Path where the XML/PDF file will be saved.
 
     Returns:
-        bool: True if the XML file was successfully downloaded, False otherwise.
+        bool: True if XML or PDF was successfully downloaded, False otherwise.
     """
     # First, search for the article using DOI to get PMCID
     search_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
@@ -992,14 +993,11 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
         logger.error(f"Error searching Europe PMC for DOI {doi}: {search_err}")
         return False
 
-    # Download full-text XML using PMCID
+    # 1) Prefer full-text XML when available
     xml_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML"
-
     try:
         xml_response = requests.get(xml_url, timeout=60)
         xml_response.raise_for_status()
-
-        # Check if we got valid XML content
         xml_content = xml_response.content
         if xml_content.startswith(b"<?xml") or xml_content.startswith(b"<"):
             xml_path = output_path.with_suffix(".xml")
@@ -1009,13 +1007,45 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
                 f"Successfully downloaded XML from Europe PMC for DOI {doi} to {xml_path}."
             )
             return True
-        else:
-            logger.warning(f"Europe PMC did not return valid XML for DOI {doi}.")
-            return False
-
+        logger.warning(f"Europe PMC did not return valid XML for DOI {doi}.")
     except Exception as xml_err:
-        logger.error(f"Failed to download XML from Europe PMC for DOI {doi}: {xml_err}")
-        return False
+        logger.warning(
+            f"Failed to download XML from Europe PMC for DOI {doi}: {xml_err}. "
+            "Trying PDF render."
+        )
+
+    # 2) Fall back to Europe PMC PDF render (works for author manuscripts
+    # without fullTextXML, e.g. PMC5924899 / 10.1073/pnas.1718406115).
+    pdf_urls = [
+        f"https://europepmc.org/articles/{pmcid}?pdf=render",
+        f"https://europepmc.org/api/getPdf?pmcid={pmcid}",
+    ]
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (compatible; paperscraper/1.0; "
+            "+https://github.com/ZitnikLab/paperscraper)"
+        )
+    }
+    for pdf_url in pdf_urls:
+        try:
+            pdf_response = requests.get(pdf_url, headers=headers, timeout=90)
+            pdf_response.raise_for_status()
+            if _write_pdf_bytes(output_path, pdf_response.content):
+                logger.info(
+                    f"Successfully downloaded PDF from Europe PMC for DOI {doi} "
+                    f"via {pdf_url}."
+                )
+                return True
+            logger.warning(
+                f"Europe PMC PDF URL did not return a valid PDF for {doi}: {pdf_url}"
+            )
+        except Exception as pdf_err:
+            logger.warning(
+                f"Europe PMC PDF fetch failed for DOI {doi} via {pdf_url}: {pdf_err}"
+            )
+
+    logger.error(f"Europe PMC fallback exhausted for DOI {doi} (PMCID {pmcid}).")
+    return False
 
 
 def fallback_openalex(doi: str, output_path: Path) -> bool:

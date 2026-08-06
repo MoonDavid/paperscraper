@@ -422,3 +422,46 @@ class TestPDF:
         assert not output_path.with_suffix(".xml").exists()
         # Check for the specific APIKEY_INVALID error in the logs
         assert "invalid" in caplog.text.lower()
+
+    @patch("requests.get")
+    def test_fallback_europepmc_pdf_when_xml_missing(self, mock_get):
+        """Europe PMC should recover via PDF render when fullTextXML 404s."""
+        search = MagicMock()
+        search.raise_for_status = MagicMock()
+        search.json.return_value = {
+            "resultList": {"result": [{"pmcid": "PMC5924899"}]}
+        }
+        xml_404 = MagicMock()
+        xml_404.raise_for_status.side_effect = Exception("404 Not Found")
+        pdf_ok = MagicMock()
+        pdf_ok.raise_for_status = MagicMock()
+        pdf_ok.content = b"%PDF-1.4 europepmc test content"
+        mock_get.side_effect = [search, xml_404, pdf_ok]
+
+        output_path = Path("test_europepmc_pdf_output")
+        try:
+            assert FALLBACKS["europepmc"]("10.1073/pnas.1718406115", output_path) is True
+            pdf_path = output_path.with_suffix(".pdf")
+            assert pdf_path.exists()
+            assert pdf_path.read_bytes().startswith(b"%PDF")
+            assert not output_path.with_suffix(".xml").exists()
+        finally:
+            if output_path.with_suffix(".pdf").exists():
+                os.remove(output_path.with_suffix(".pdf"))
+
+    def test_fallback_europepmc_pnas_pdf_real_api(self):
+        """Live: PNAS author manuscript available as Europe PMC PDF, not XML."""
+        test_doi = "10.1073/pnas.1718406115"
+        output_path = Path("test_europepmc_pnas")
+        try:
+            result = FALLBACKS["europepmc"](test_doi, output_path)
+            assert result is True
+            pdf_path = output_path.with_suffix(".pdf")
+            assert pdf_path.exists()
+            assert pdf_path.read_bytes()[:4] == b"%PDF"
+            assert pdf_path.stat().st_size > 10_000
+        finally:
+            for suf in (".pdf", ".xml"):
+                p = output_path.with_suffix(suf)
+                if p.exists():
+                    os.remove(p)
