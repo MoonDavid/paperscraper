@@ -1,0 +1,973 @@
+{
+  "doi": "10.1073/pnas.1718406115",
+  "url": "https://www.pnas.org/doi/10.1073/pnas.1718406115",
+  "started": "2026-08-06T11:42:48.027997+00:00",
+  "finished": "2026-08-06T11:43:17.627963+00:00",
+  "n_attempts": 53,
+  "n_successes": 7,
+  "success_methods": [
+    "openalex_probe",
+    "crossref_probe",
+    "semantic_scholar_probe",
+    "europepmc_rest_search",
+    "europepmc_pdf_render",
+    "ncbi_idconv",
+    "pmc_pdf_2"
+  ],
+  "attempts": [
+    {
+      "attempt": 1,
+      "name": "direct[paperscraper]->www.pnas.org_doi_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:48.027997+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5569,
+        "headers_req": {
+          "User-Agent": "paperscraper/1.0 (+https)",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[paperscraper]->www.pnas.org_doi_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 2,
+      "name": "direct[paperscraper]->doi.org_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:48.429274+00:00",
+      "detail": {
+        "url": "https://doi.org/10.1073/pnas.1718406115",
+        "final_url": "https://pnas.org/doi/full/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5580,
+        "headers_req": {
+          "User-Agent": "paperscraper/1.0 (+https)",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[paperscraper]->doi.org_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 3,
+      "name": "direct[paperscraper]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:48.763272+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5602,
+        "headers_req": {
+          "User-Agent": "paperscraper/1.0 (+https)",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[paperscraper]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 4,
+      "name": "direct[paperscraper]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115?download=true",
+      "success": false,
+      "ts": "2026-08-06T11:42:49.103864+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115?download=true",
+        "final_url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115?download=true",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5659,
+        "headers_req": {
+          "User-Agent": "paperscraper/1.0 (+https)",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[paperscraper]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115?download=true.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 5,
+      "name": "direct[paperscraper]->pnas.org_doi_pdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:49.439760+00:00",
+      "detail": {
+        "url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "final_url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5556,
+        "headers_req": {
+          "User-Agent": "paperscraper/1.0 (+https)",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[paperscraper]->pnas.org_doi_pdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 6,
+      "name": "direct[paperscraper]->www.pnas.org_doi_epdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:49.772873+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/epdf/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/epdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5605,
+        "headers_req": {
+          "User-Agent": "paperscraper/1.0 (+https)",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[paperscraper]->www.pnas.org_doi_epdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 7,
+      "name": "direct[paperscraper]->www.pnas.org_content_pnas_pnas.1718406115.full.pdf",
+      "success": false,
+      "ts": "2026-08-06T11:42:50.103748+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/content/pnas/pnas.1718406115.full.pdf",
+        "final_url": "https://www.pnas.org/content/pnas/pnas.1718406115.full.pdf",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5620,
+        "headers_req": {
+          "User-Agent": "paperscraper/1.0 (+https)",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[paperscraper]->www.pnas.org_content_pnas_pnas.1718406115.full.pdf.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 8,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:50.435868+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5740,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 9,
+      "name": "direct[Mozilla/5.0 ]->doi.org_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:50.810535+00:00",
+      "detail": {
+        "url": "https://doi.org/10.1073/pnas.1718406115",
+        "final_url": "https://pnas.org/doi/full/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5751,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->doi.org_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 10,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:51.143426+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5773,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 11,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115?download=true",
+      "success": false,
+      "ts": "2026-08-06T11:42:51.477493+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115?download=true",
+        "final_url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115?download=true",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5851,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115?download=true.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 12,
+      "name": "direct[Mozilla/5.0 ]->pnas.org_doi_pdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:51.809052+00:00",
+      "detail": {
+        "url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "final_url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5748,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->pnas.org_doi_pdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 13,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_epdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:52.138547+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/epdf/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/epdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5776,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_epdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 14,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_content_pnas_pnas.1718406115.full.pdf",
+      "success": false,
+      "ts": "2026-08-06T11:42:52.470893+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/content/pnas/pnas.1718406115.full.pdf",
+        "final_url": "https://www.pnas.org/content/pnas/pnas.1718406115.full.pdf",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5791,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_content_pnas_pnas.1718406115.full.pdf.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 15,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:52.805617+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5697,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 16,
+      "name": "direct[Mozilla/5.0 ]->doi.org_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:53.173983+00:00",
+      "detail": {
+        "url": "https://doi.org/10.1073/pnas.1718406115",
+        "final_url": "https://pnas.org/doi/full/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5708,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->doi.org_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 17,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:53.507325+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5709,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 18,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115?download=true",
+      "success": false,
+      "ts": "2026-08-06T11:42:53.841060+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115?download=true",
+        "final_url": "https://www.pnas.org/doi/pdf/10.1073/pnas.1718406115?download=true",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5788,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_pdf_10.1073_pnas.1718406115?download=true.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 19,
+      "name": "direct[Mozilla/5.0 ]->pnas.org_doi_pdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:54.174527+00:00",
+      "detail": {
+        "url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "final_url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5705,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->pnas.org_doi_pdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 20,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_doi_epdf_10.1073_pnas.1718406115",
+      "success": false,
+      "ts": "2026-08-06T11:42:54.513050+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/doi/epdf/10.1073/pnas.1718406115",
+        "final_url": "https://www.pnas.org/doi/epdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5712,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_doi_epdf_10.1073_pnas.1718406115.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 21,
+      "name": "direct[Mozilla/5.0 ]->www.pnas.org_content_pnas_pnas.1718406115.full.pdf",
+      "success": false,
+      "ts": "2026-08-06T11:42:54.846202+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/content/pnas/pnas.1718406115.full.pdf",
+        "final_url": "https://www.pnas.org/content/pnas/pnas.1718406115.full.pdf",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5749,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+          "Accept": "application/pdf,*/*"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/direct[Mozilla_5.0 ]->www.pnas.org_content_pnas_pnas.1718406115.full.pdf.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 22,
+      "name": "citation_pdf_meta[paperscraper/1.0 (+https]",
+      "success": false,
+      "ts": "2026-08-06T11:42:55.350629+00:00",
+      "detail": {
+        "landing_status": 403,
+        "landing_url": "https://pnas.org/doi/full/10.1073/pnas.1718406115",
+        "meta_found": false,
+        "meta_content": null,
+        "pnas_status": 403,
+        "pnas_url": "https://www.pnas.org/doi/10.1073/pnas.1718406115"
+      },
+      "error": "no citation_pdf_url meta",
+      "path": null
+    },
+    {
+      "attempt": 23,
+      "name": "citation_pdf_meta[Mozilla/5.0 (X11; Linux ]",
+      "success": false,
+      "ts": "2026-08-06T11:42:55.952464+00:00",
+      "detail": {
+        "landing_status": 403,
+        "landing_url": "https://pnas.org/doi/full/10.1073/pnas.1718406115",
+        "meta_found": false,
+        "meta_content": null,
+        "pnas_status": 403,
+        "pnas_url": "https://www.pnas.org/doi/10.1073/pnas.1718406115"
+      },
+      "error": "no citation_pdf_url meta",
+      "path": null
+    },
+    {
+      "attempt": 24,
+      "name": "citation_pdf_meta[Mozilla/5.0 (Windows NT ]",
+      "success": false,
+      "ts": "2026-08-06T11:42:56.552619+00:00",
+      "detail": {
+        "landing_status": 403,
+        "landing_url": "https://pnas.org/doi/full/10.1073/pnas.1718406115",
+        "meta_found": false,
+        "meta_content": null,
+        "pnas_status": 403,
+        "pnas_url": "https://www.pnas.org/doi/10.1073/pnas.1718406115"
+      },
+      "error": "no citation_pdf_url meta",
+      "path": null
+    },
+    {
+      "attempt": 25,
+      "name": "unpaywall_probe",
+      "success": false,
+      "ts": "2026-08-06T11:42:57.103164+00:00",
+      "detail": {
+        "status": 422,
+        "is_oa": null,
+        "pdf_url": null,
+        "oa_locations": 0
+      },
+      "error": "no url_for_pdf",
+      "path": null
+    },
+    {
+      "attempt": 26,
+      "name": "openalex_probe",
+      "success": true,
+      "ts": "2026-08-06T11:42:57.314699+00:00",
+      "detail": {
+        "status": 200,
+        "pdf_url": "https://www.pnas.org/content/pnas/115/17/E3879.full.pdf",
+        "oa": {
+          "is_oa": true,
+          "oa_status": "bronze",
+          "oa_url": "https://www.pnas.org/content/pnas/115/17/E3879.full.pdf",
+          "any_repository_has_fulltext": false
+        }
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 27,
+      "name": "openalex_pdf",
+      "success": false,
+      "ts": "2026-08-06T11:42:57.346381+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/content/pnas/115/17/E3879.full.pdf",
+        "final_url": "https://www.pnas.org/content/pnas/115/17/E3879.full.pdf",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5782,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/openalex_pdf.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 28,
+      "name": "crossref_probe",
+      "success": true,
+      "ts": "2026-08-06T11:42:57.409328+00:00",
+      "detail": {
+        "status": 200,
+        "links": [
+          {
+            "URL": "http://www.pnas.org/syndication/doi/10.1073/pnas.1718406115",
+            "content-type": "unspecified",
+            "content-version": "vor",
+            "intended-application": "syndication"
+          },
+          {
+            "URL": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+            "content-type": "unspecified",
+            "content-version": "vor",
+            "intended-application": "similarity-checking"
+          }
+        ],
+        "pdf_links": [
+          "https://pnas.org/doi/pdf/10.1073/pnas.1718406115"
+        ]
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 29,
+      "name": "crossref_pdf_0",
+      "success": false,
+      "ts": "2026-08-06T11:42:57.438580+00:00",
+      "detail": {
+        "url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "final_url": "https://pnas.org/doi/pdf/10.1073/pnas.1718406115",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5748,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/crossref_pdf_0.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 30,
+      "name": "semantic_scholar_probe",
+      "success": true,
+      "ts": "2026-08-06T11:42:57.598685+00:00",
+      "detail": {
+        "status": 200,
+        "pdf_url": "https://www.pnas.org/content/pnas/115/17/E3879.full.pdf",
+        "isOpenAccess": true
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 31,
+      "name": "semantic_scholar_pdf",
+      "success": false,
+      "ts": "2026-08-06T11:42:57.630018+00:00",
+      "detail": {
+        "url": "https://www.pnas.org/content/pnas/115/17/E3879.full.pdf",
+        "final_url": "https://www.pnas.org/content/pnas/115/17/E3879.full.pdf",
+        "status": 403,
+        "content_type": "text/html; charset=UTF-8",
+        "bytes": 5782,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/semantic_scholar_pdf.response.bin",
+        "startswith": "<!DOCTYPE html><html lang=\"en-US\"><head>"
+      },
+      "error": "HTTP 403, not a PDF (ctype=text/html; charset=UTF-8)",
+      "path": null
+    },
+    {
+      "attempt": 32,
+      "name": "europepmc_rest_search",
+      "success": true,
+      "ts": "2026-08-06T11:42:58.078631+00:00",
+      "detail": {
+        "n_results": 1,
+        "pmcid": "PMC5924899",
+        "hasPDF": "Y",
+        "isOpenAccess": "N"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 33,
+      "name": "europepmc_pdf_render",
+      "success": true,
+      "ts": "2026-08-06T11:43:00.053369+00:00",
+      "detail": {
+        "url": "https://europepmc.org/articles/PMC5924899?pdf=render",
+        "final_url": "https://europepmc.org/api/getPdf?pmcid=PMC5924899",
+        "status": 200,
+        "content_type": "application/pdf",
+        "bytes": 1452260,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+      },
+      "error": null,
+      "path": "/workspace/artifacts/pnas_download/pdfs/europepmc_render.pdf"
+    },
+    {
+      "attempt": 34,
+      "name": "ncbi_idconv",
+      "success": true,
+      "ts": "2026-08-06T11:43:00.142461+00:00",
+      "detail": {
+        "status": 200,
+        "records": [
+          {
+            "doi": "10.1073/pnas.1718406115",
+            "pmcid": "PMC5924899",
+            "pmid": 29636419,
+            "requested-id": "10.1073/pnas.1718406115"
+          }
+        ]
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 35,
+      "name": "pmc_pdf_0",
+      "success": false,
+      "ts": "2026-08-06T11:43:00.228333+00:00",
+      "detail": {
+        "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5924899/pdf/",
+        "final_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5924899/pdf/",
+        "status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 20350,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/pmc_pdf_0.response.bin",
+        "startswith": "<!doctype html><html lang=\"en-US\" dir=\"l"
+      },
+      "error": "HTTP 200, not a PDF (ctype=text/html; charset=utf-8)",
+      "path": null
+    },
+    {
+      "attempt": 36,
+      "name": "pmc_pdf_1",
+      "success": false,
+      "ts": "2026-08-06T11:43:00.312597+00:00",
+      "detail": {
+        "url": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5924899/pdf/PMC5924899.pdf",
+        "final_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5924899/pdf/PMC5924899.pdf",
+        "status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "bytes": 20399,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        },
+        "snippet_path": "/workspace/artifacts/pnas_download/pdfs/pmc_pdf_1.response.bin",
+        "startswith": "<!doctype html><html lang=\"en-US\" dir=\"l"
+      },
+      "error": "HTTP 200, not a PDF (ctype=text/html; charset=utf-8)",
+      "path": null
+    },
+    {
+      "attempt": 37,
+      "name": "pmc_pdf_2",
+      "success": true,
+      "ts": "2026-08-06T11:43:02.192403+00:00",
+      "detail": {
+        "url": "https://europepmc.org/articles/PMC5924899?pdf=render",
+        "final_url": "https://europepmc.org/api/getPdf?pmcid=PMC5924899",
+        "status": 200,
+        "content_type": "application/pdf",
+        "bytes": 1452260,
+        "headers_req": {
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+      },
+      "error": null,
+      "path": "/workspace/artifacts/pnas_download/pdfs/pmc_2.pdf"
+    },
+    {
+      "attempt": 38,
+      "name": "save_pdf",
+      "success": false,
+      "ts": "2026-08-06T11:43:05.766744+00:00",
+      "detail": {
+        "success": false,
+        "method": "abstract",
+        "filetype": "txt"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 39,
+      "name": "fallback:bioc_pmc",
+      "success": false,
+      "ts": "2026-08-06T11:43:06.286612+00:00",
+      "detail": {
+        "fallback": "bioc_pmc"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 40,
+      "name": "fallback:elife",
+      "success": false,
+      "ts": "2026-08-06T11:43:06.787344+00:00",
+      "detail": {
+        "fallback": "elife"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 41,
+      "name": "fallback:elsevier",
+      "success": false,
+      "ts": "2026-08-06T11:43:07.287605+00:00",
+      "detail": {
+        "fallback": "elsevier"
+      },
+      "error": "skipped: missing ELSEVIER_TDM_API_KEY",
+      "path": null
+    },
+    {
+      "attempt": 42,
+      "name": "fallback:europepmc",
+      "success": false,
+      "ts": "2026-08-06T11:43:08.548345+00:00",
+      "detail": {
+        "fallback": "europepmc"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 43,
+      "name": "fallback:s3",
+      "success": false,
+      "ts": "2026-08-06T11:43:09.049027+00:00",
+      "detail": {
+        "fallback": "s3"
+      },
+      "error": "skipped: missing AWS credentials",
+      "path": null
+    },
+    {
+      "attempt": 44,
+      "name": "fallback:wiley",
+      "success": false,
+      "ts": "2026-08-06T11:43:09.549513+00:00",
+      "detail": {
+        "fallback": "wiley"
+      },
+      "error": "skipped: missing WILEY_TDM_API_TOKEN",
+      "path": null
+    },
+    {
+      "attempt": 45,
+      "name": "fallback:unpaywall",
+      "success": false,
+      "ts": "2026-08-06T11:43:10.088152+00:00",
+      "detail": {
+        "fallback": "unpaywall"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 46,
+      "name": "fallback:springer",
+      "success": false,
+      "ts": "2026-08-06T11:43:10.588822+00:00",
+      "detail": {
+        "fallback": "springer"
+      },
+      "error": "skipped: missing SPRINGER_API_KEY",
+      "path": null
+    },
+    {
+      "attempt": 47,
+      "name": "fallback:plos",
+      "success": false,
+      "ts": "2026-08-06T11:43:11.089318+00:00",
+      "detail": {
+        "fallback": "plos"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 48,
+      "name": "fallback:openalex",
+      "success": false,
+      "ts": "2026-08-06T11:43:11.809145+00:00",
+      "detail": {
+        "fallback": "openalex"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 49,
+      "name": "fallback:crossref",
+      "success": false,
+      "ts": "2026-08-06T11:43:12.346721+00:00",
+      "detail": {
+        "fallback": "crossref"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 50,
+      "name": "fallback:arxiv",
+      "success": false,
+      "ts": "2026-08-06T11:43:12.890636+00:00",
+      "detail": {
+        "fallback": "arxiv"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 51,
+      "name": "fallback:medrxiv_s3",
+      "success": false,
+      "ts": "2026-08-06T11:43:13.391298+00:00",
+      "detail": {
+        "fallback": "medrxiv_s3"
+      },
+      "error": "skipped: missing AWS credentials",
+      "path": null
+    },
+    {
+      "attempt": 52,
+      "name": "fallback:doaj",
+      "success": false,
+      "ts": "2026-08-06T11:43:14.032100+00:00",
+      "detail": {
+        "fallback": "doaj"
+      },
+      "error": null,
+      "path": null
+    },
+    {
+      "attempt": 53,
+      "name": "debug_save_pdf_all",
+      "success": false,
+      "ts": "2026-08-06T11:43:17.627783+00:00",
+      "detail": {
+        "direct": false,
+        "results": {
+          "direct": false,
+          "unpaywall": false,
+          "europepmc": false,
+          "bioc_pmc": false,
+          "plos": false,
+          "elife": false,
+          "openalex": false,
+          "crossref": false,
+          "doaj": false,
+          "arxiv": false,
+          "springer": false,
+          "wiley": false,
+          "elsevier": false
+        },
+        "successes": [],
+        "first_saved": null
+      },
+      "error": null,
+      "path": null
+    }
+  ],
+  "recovered_files": [
+    "artifacts/pnas_download/pdfs/save_pdf_after_fix.pdf",
+    "artifacts/pnas_download/pnas.1718406115.pdf"
+  ],
+  "final_verdict": {
+    "success": true,
+    "canonical_pdf": "artifacts/pnas_download/pnas.1718406115.pdf",
+    "size_bytes": 1452260,
+    "pages": 9,
+    "working_methods": [
+      "europepmc.org/articles/PMC5924899?pdf=render",
+      "europepmc.org/api/getPdf?pmcid=PMC5924899",
+      "wget same URL",
+      "curl -L same URL"
+    ],
+    "failed_notable": [
+      "pnas.org direct (HTTP 403 Cloudflare/bot block)",
+      "doi.org redirect to pnas (403)",
+      "paperscraper save_pdf (all built-in fallbacks failed: XML 404, PNAS PDF 403)",
+      "Unpaywall (422 with example.com email / no url_for_pdf)",
+      "BioC-PMC XML missing",
+      "PMC OA package (idIsNotOpenAccess)",
+      "NCBI PMC /pdf/ HTML interstitial"
+    ],
+    "pmcid": "PMC5924899",
+    "note": "Paper is author manuscript in PMC/EuropePMC; publisher PNAS site blocks automated PDF fetch with 403.",
+    "updated": "2026-08-06T11:43:41.815027+00:00"
+  }
+}

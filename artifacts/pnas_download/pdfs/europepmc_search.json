@@ -1,0 +1,340 @@
+{
+  "version": "6.9",
+  "hitCount": 1,
+  "request": {
+    "queryString": "DOI:10.1073/pnas.1718406115",
+    "resultType": "core",
+    "cursorMark": "*",
+    "pageSize": 25,
+    "sort": "",
+    "synonym": false
+  },
+  "resultList": {
+    "result": [
+      {
+        "id": "29636419",
+        "source": "MED",
+        "pmid": "29636419",
+        "pmcid": "PMC5924899",
+        "fullTextIdList": {
+          "fullTextId": [
+            "PMC5924899"
+          ]
+        },
+        "doi": "10.1073/pnas.1718406115",
+        "title": "Transcriptome-wide discovery of coding and noncoding RNA-binding proteins.",
+        "authorString": "Huang R, Han M, Meng L, Chen X.",
+        "authorList": {
+          "author": [
+            {
+              "fullName": "Huang R",
+              "firstName": "Rongbing",
+              "lastName": "Huang",
+              "initials": "R",
+              "authorId": {
+                "type": "ORCID",
+                "value": "0000-0002-1456-6625"
+              },
+              "authorAffiliationDetailsList": {
+                "authorAffiliation": [
+                  {
+                    "affiliation": "College of Chemistry and Molecular Engineering, Peking University, 100871 Beijing, China."
+                  },
+                  {
+                    "affiliation": "Beijing National Laboratory for Molecular Sciences, 100871 Beijing, China."
+                  }
+                ]
+              }
+            },
+            {
+              "fullName": "Han M",
+              "firstName": "Mengting",
+              "lastName": "Han",
+              "initials": "M",
+              "authorId": {
+                "type": "ORCID",
+                "value": "0000-0002-6253-2470"
+              },
+              "authorAffiliationDetailsList": {
+                "authorAffiliation": [
+                  {
+                    "affiliation": "College of Chemistry and Molecular Engineering, Peking University, 100871 Beijing, China."
+                  },
+                  {
+                    "affiliation": "Beijing National Laboratory for Molecular Sciences, 100871 Beijing, China."
+                  }
+                ]
+              }
+            },
+            {
+              "fullName": "Meng L",
+              "firstName": "Liying",
+              "lastName": "Meng",
+              "initials": "L",
+              "authorAffiliationDetailsList": {
+                "authorAffiliation": [
+                  {
+                    "affiliation": "College of Chemistry and Molecular Engineering, Peking University, 100871 Beijing, China."
+                  },
+                  {
+                    "affiliation": "Peking-Tsinghua Center for Life Sciences, Peking University, 100871 Beijing, China."
+                  }
+                ]
+              }
+            },
+            {
+              "fullName": "Chen X",
+              "firstName": "Xing",
+              "lastName": "Chen",
+              "initials": "X",
+              "authorId": {
+                "type": "ORCID",
+                "value": "0000-0002-3058-7370"
+              },
+              "authorAffiliationDetailsList": {
+                "authorAffiliation": [
+                  {
+                    "affiliation": "College of Chemistry and Molecular Engineering, Peking University, 100871 Beijing, China; xingchen@pku.edu.cn."
+                  },
+                  {
+                    "affiliation": "Beijing National Laboratory for Molecular Sciences, 100871 Beijing, China."
+                  },
+                  {
+                    "affiliation": "Peking-Tsinghua Center for Life Sciences, Peking University, 100871 Beijing, China."
+                  },
+                  {
+                    "affiliation": "Synthetic and Functional Biomolecules Center, Peking University, 100871 Beijing, China."
+                  },
+                  {
+                    "affiliation": "Key Laboratory of Bioorganic Chemistry and Molecular Engineering of Ministry of Education, Peking University, 100871 Beijing, China."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "authorIdList": {
+          "authorId": [
+            {
+              "type": "ORCID",
+              "value": "0000-0002-1456-6625"
+            },
+            {
+              "type": "ORCID",
+              "value": "0000-0002-3058-7370"
+            },
+            {
+              "type": "ORCID",
+              "value": "0000-0002-6253-2470"
+            }
+          ]
+        },
+        "dataLinksTagsList": {
+          "dataLinkstag": [
+            "altmetrics",
+            "supporting_data"
+          ]
+        },
+        "journalInfo": {
+          "issue": "17",
+          "volume": "115",
+          "journalIssueId": 2675798,
+          "dateOfPublication": "2018 Apr",
+          "monthOfPublication": 4,
+          "yearOfPublication": 2018,
+          "printPublicationDate": "2018-04-01",
+          "journal": {
+            "title": "Proceedings of the National Academy of Sciences of the United States of America",
+            "medlineAbbreviation": "Proc Natl Acad Sci U S A",
+            "essn": "1091-6490",
+            "issn": "0027-8424",
+            "isoabbreviation": "Proc Natl Acad Sci U S A",
+            "nlmid": "7505876"
+          }
+        },
+        "pubYear": "2018",
+        "pageInfo": "E3879-E3887",
+        "abstractText": "Transcriptome-wide identification of RNA-binding proteins (RBPs) is a prerequisite for understanding the posttranscriptional gene regulation networks. However, proteomic profiling of RBPs has been mostly limited to polyadenylated mRNA-binding proteins, leaving RBPs on nonpoly(A) RNAs, including most noncoding RNAs (ncRNAs) and pre-mRNAs, largely undiscovered. Here we present a click chemistry-assisted RNA interactome capture (CARIC) strategy, which enables unbiased identification of RBPs, independent of the polyadenylation state of RNAs. CARIC combines metabolic labeling of RNAs with an alkynyl uridine analog and in vivo RNA-protein photocross-linking, followed by click reaction with azide-biotin, affinity enrichment, and proteomic analysis. Applying CARIC, we identified 597 RBPs in HeLa cells, including 130 previously unknown RBPs. These newly discovered RBPs can likely bind ncRNAs, thus uncovering potential involvement of ncRNAs in processes previously unknown to be ncRNA-related, such as proteasome function and intermediary metabolism. The CARIC strategy should be broadly applicable across various organisms to complete the census of RBPs.",
+        "affiliation": "College of Chemistry and Molecular Engineering, Peking University, 100871 Beijing, China.",
+        "publicationStatus": "ppublish",
+        "language": "eng",
+        "pubModel": "Print-Electronic",
+        "pubTypeList": {
+          "pubType": [
+            "Research Support, Non-U.S. Gov't",
+            "research-article",
+            "Journal Article"
+          ]
+        },
+        "grantsList": {
+          "grant": [
+            {
+              "grantId": "2016YFA0501500",
+              "agency": "National Key Research and Development Projects",
+              "orderIn": 0
+            },
+            {
+              "grantId": "21425204",
+              "agency": "National Natural Science Foundation of China",
+              "orderIn": 0
+            },
+            {
+              "grantId": "21521003",
+              "agency": "National Natural Science Foundation of China",
+              "orderIn": 0
+            },
+            {
+              "grantId": "91753206",
+              "agency": "National Natural Science Foundation of China",
+              "orderIn": 0
+            }
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Hela Cells"
+            },
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Humans"
+            },
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "RNA-Binding Proteins",
+              "meshQualifierList": {
+                "meshQualifier": [
+                  {
+                    "abbreviation": "GE",
+                    "qualifierName": "genetics",
+                    "majorTopic_YN": "N"
+                  },
+                  {
+                    "abbreviation": "ME",
+                    "qualifierName": "metabolism",
+                    "majorTopic_YN": "Y"
+                  }
+                ]
+              }
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Gene Expression Profiling"
+            },
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "HEK293 Cells"
+            },
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Transcriptome",
+              "meshQualifierList": {
+                "meshQualifier": [
+                  {
+                    "abbreviation": "PH",
+                    "qualifierName": "physiology",
+                    "majorTopic_YN": "Y"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "keywordList": {
+          "keyword": [
+            "RNA",
+            "Proteomics",
+            "Noncoding RNA",
+            "Rna\u2013protein Interactions",
+            "Bioorthogonal Chemistry"
+          ]
+        },
+        "chemicalList": {
+          "chemical": [
+            {
+              "name": "RNA-Binding Proteins",
+              "registryNumber": "0"
+            }
+          ]
+        },
+        "subsetList": {
+          "subset": [
+            {
+              "code": "IM",
+              "name": "Index Medicus"
+            }
+          ]
+        },
+        "fullTextUrlList": {
+          "fullTextUrl": [
+            {
+              "availability": "Subscription required",
+              "availabilityCode": "S",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1073/pnas.1718406115"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "html",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC5924899"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "pdf",
+              "site": "Europe_PMC",
+              "url": "https://europepmc.org/articles/PMC5924899?pdf=render"
+            },
+            {
+              "availability": "Free",
+              "availabilityCode": "F",
+              "documentStyle": "doi",
+              "site": "DOI",
+              "url": "https://doi.org/10.1073/pnas.1718406115"
+            }
+          ]
+        },
+        "commentCorrectionList": {
+          "commentCorrection": [
+            {
+              "id": "29855583",
+              "source": "MED",
+              "reference": "Nat Methods. 2018 Jun;15(6):408. doi: 10.1038/s41592-018-0025-z",
+              "type": "Comment in",
+              "orderIn": 1
+            }
+          ]
+        },
+        "isOpenAccess": "N",
+        "inEPMC": "Y",
+        "inPMC": "Y",
+        "hasPDF": "Y",
+        "hasBook": "N",
+        "hasSuppl": "Y",
+        "citedByCount": 141,
+        "hasData": "Y",
+        "hasReferences": "Y",
+        "hasTextMinedTerms": "Y",
+        "hasDbCrossReferences": "N",
+        "hasLabsLinks": "Y",
+        "hasEvaluations": "N",
+        "authMan": "N",
+        "epmcAuthMan": "N",
+        "nihAuthMan": "N",
+        "hasTMAccessionNumbers": "N",
+        "dateOfCompletion": "2018-08-13",
+        "dateOfCreation": "2018-04-12",
+        "firstIndexDate": "2018-04-12",
+        "fullTextReceivedDate": "2020-07-12",
+        "dateOfRevision": "2018-11-14",
+        "electronicPublicationDate": "2018-04-10",
+        "firstPublicationDate": "2018-04-10",
+        "embargoDate": "2018-10-24"
+      }
+    ]
+  }
+}

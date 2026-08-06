@@ -1,0 +1,25 @@
+{
+  "status": "ok",
+  "response-date": "2026-08-06 07:43:00",
+  "request": {
+    "warnings": [],
+    "format": "json",
+    "idtype": "doi",
+    "ids": [
+      "10.1073/pnas.1718406115"
+    ],
+    "email": "paperscraper-debug@example.com",
+    "tool": "paperscraper",
+    "echo": "tool=paperscraper&email=paperscraper-debug%40example.com&ids=10.1073%2Fpnas.1718406115&idtype=doi&format=json",
+    "versions": "no",
+    "showaiid": "no"
+  },
+  "records": [
+    {
+      "doi": "10.1073/pnas.1718406115",
+      "pmcid": "PMC5924899",
+      "pmid": 29636419,
+      "requested-id": "10.1073/pnas.1718406115"
+    }
+  ]
+}

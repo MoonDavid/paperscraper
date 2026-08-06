@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from ..utils import load_jsonl
 from .fallbacks import FALLBACKS
+from .markdown import maybe_convert_download
 from .utils import download_pdf_to_path, load_api_keys
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -188,29 +189,33 @@ def _get_abstract_europepmc(doi: str, timeout: int = 20) -> Optional[str]:
         return None
 
 
-# --- Replace abstract retrieval section in save_pdf with the following block ---
+# Full-text retrieval (PDF/XML/Markdown)
 
 
-def save_pdf(
+def save_file(
     paper_metadata: Dict[str, Any],
     filepath: Union[str, Path],
     save_metadata: bool = False,
     api_keys: Optional[Union[str, Dict[str, str]]] = None,
     preferred_type: str = "pdf",
     mail: Optional[str] = None,
+    to_markdown: bool = False,
 ) -> Dict[str, Any]:
     """
-    Save a PDF file of a paper.
+    Save a full-text file for a paper (PDF and/or XML, optionally Markdown).
 
     Args:
         paper_metadata: A dictionary with the paper metadata. Must contain the `doi` key.
-        filepath: Path to the PDF file to be saved (with or without suffix).
+        filepath: Path to the file to be saved (with or without suffix).
         save_metadata: A boolean indicating whether to save paper metadata as a separate json.
         api_keys: Either a dictionary containing API keys (if already loaded) or a string (path to API keys file).
                   If None, will try to load from `.env` file and if unsuccessful, skip API-based fallbacks.
         preferred_type: Preferred file type to download, 'pdf' or 'xml'. Defaults to 'pdf'.
+        mail: Optional email for Unpaywall / NCBI-style API requests.
+        to_markdown: If True, also convert a successful PDF/XML download to Markdown
+            beside the binary via Firecrawl ``anydoc`` (``pip install paperscraper[markdown]``).
     Returns:
-        A dict summary: {success: bool, method: str|None, filetype: 'pdf'|'xml'|None}
+        A dict summary: {success: bool, method: str|None, filetype: 'pdf'|'xml'|None, markdown: str|None}
     """
     if not isinstance(paper_metadata, Dict):
         raise TypeError(f"paper_metadata must be a dict, not {type(paper_metadata)}.")
@@ -224,7 +229,7 @@ def save_pdf(
     if not output_path.parent.exists():
         raise ValueError(f"The folder: {output_path.parent} seems to not exist.")
 
-    # load API keys from file if not already loaded via in save_pdf_from_dump (dict)
+    # load API keys from file if not already loaded via save_file_from_dump (dict)
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
     doi = paper_metadata["doi"]
@@ -236,6 +241,14 @@ def save_pdf(
     soup = None
     final_url = None
 
+    def _finish(result: Dict[str, Any]) -> Dict[str, Any]:
+        md_path = maybe_convert_download(
+            output_path, result.get("filetype"), to_markdown=to_markdown
+        )
+        out = dict(result)
+        out["markdown"] = str(md_path) if md_path else None
+        return out
+
     # ChemRxiv HTML pages are often Cloudflare-blocked; use the Open Engage API.
     if "chemrxiv" in doi.lower():
         item = _get_chemrxiv_item(doi, user_agent)
@@ -246,11 +259,13 @@ def save_pdf(
             if pdf_url:
                 try:
                     if download_pdf_to_path(pdf_url, output_path, user_agent):
-                        return {
-                            "success": True,
-                            "method": "chemrxiv",
-                            "filetype": "pdf",
-                        }
+                        return _finish(
+                            {
+                                "success": True,
+                                "method": "chemrxiv",
+                                "filetype": "pdf",
+                            }
+                        )
                     logger.warning(
                         f"ChemRxiv Open Engage PDF endpoint did not return a PDF: {pdf_url}"
                     )
@@ -289,7 +304,9 @@ def save_pdf(
 
     if success:
         if not save_metadata:
-            return {"success": True, "method": used_method, "filetype": used_filetype}
+            return _finish(
+                {"success": True, "method": used_method, "filetype": used_filetype}
+            )
 
         metadata = {}
         # Extract title
@@ -330,20 +347,23 @@ def save_pdf(
                 json.dump(metadata, f, ensure_ascii=False, indent=4)
         except Exception as e:
             logger.error(f"Failed to save metadata to {str(output_path)}: {e}")
-        return {"success": True, "method": used_method, "filetype": used_filetype}
+        return _finish(
+            {"success": True, "method": used_method, "filetype": used_filetype}
+        )
 
     # If primary download failed, try fallbacks
     logger.info(f"Primary download failed for {doi}. Attempting fallbacks.")
 
     # Order of fallbacks tries to maximize OA coverage first
     if mail and FALLBACKS["unpaywall"](doi, output_path, mail, final_url):
-        return {"success": True, "method": "unpaywall", "filetype": "pdf"}
+        return _finish({"success": True, "method": "unpaywall", "filetype": "pdf"})
 
     if FALLBACKS["europepmc"](doi, output_path):
-        return {"success": True, "method": "europepmc", "filetype": "xml"}
+        filetype = "pdf" if Path(output_path).with_suffix(".pdf").exists() else "xml"
+        return _finish({"success": True, "method": "europepmc", "filetype": filetype})
 
     if FALLBACKS["bioc_pmc"](doi, output_path, mail or "your_email@example.com"):
-        return {"success": True, "method": "bioc_pmc", "filetype": "xml"}
+        return _finish({"success": True, "method": "bioc_pmc", "filetype": "xml"})
 
     # bioRxiv / medRxiv share the 10.1101 DOI prefix. Prefer explicit name/URL matches.
     doi_l = doi.lower()
@@ -357,11 +377,11 @@ def save_pdf(
 
     if has_aws and is_medrxiv and "medrxiv_s3" in FALLBACKS:
         if FALLBACKS["medrxiv_s3"](doi, output_path, api_keys):
-            return {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
+            return _finish({"success": True, "method": "medrxiv_s3", "filetype": "pdf"})
 
     if has_aws and (is_biorxiv or (is_1101 and not is_medrxiv)):
         if FALLBACKS["s3"](doi, output_path, api_keys):
-            return {"success": True, "method": "biorxiv_s3", "filetype": "pdf"}
+            return _finish({"success": True, "method": "biorxiv_s3", "filetype": "pdf"})
         # Ambiguous 10.1101 (no explicit bioRxiv signal): also try medRxiv S3.
         if (
             is_1101
@@ -369,48 +389,52 @@ def save_pdf(
             and "medrxiv_s3" in FALLBACKS
             and FALLBACKS["medrxiv_s3"](doi, output_path, api_keys)
         ):
-            return {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
+            return _finish({"success": True, "method": "medrxiv_s3", "filetype": "pdf"})
 
     if "plos" in doi_l:
         if FALLBACKS["plos"](doi, output_path):
-            return {"success": True, "method": "plos", "filetype": "pdf"}
+            return _finish({"success": True, "method": "plos", "filetype": "pdf"})
 
     if "elife" in doi.lower():
         if FALLBACKS["elife"](doi, output_path):
-            return {"success": True, "method": "elife", "filetype": "xml"}
+            return _finish({"success": True, "method": "elife", "filetype": "xml"})
 
     # Non-publisher OA aggregators
     if "openalex" in FALLBACKS and FALLBACKS["openalex"](doi, output_path):
-        return {"success": True, "method": "openalex", "filetype": "pdf"}
+        return _finish({"success": True, "method": "openalex", "filetype": "pdf"})
 
     if "crossref" in FALLBACKS and FALLBACKS["crossref"](
         doi, output_path, mail or "your_email@example.com"
     ):
-        return {"success": True, "method": "crossref", "filetype": "pdf"}
+        return _finish({"success": True, "method": "crossref", "filetype": "pdf"})
 
     if "doaj" in FALLBACKS and FALLBACKS["doaj"](doi, output_path):
-        return {"success": True, "method": "doaj", "filetype": "pdf"}
+        return _finish({"success": True, "method": "doaj", "filetype": "pdf"})
 
     if "arxiv" in FALLBACKS and FALLBACKS["arxiv"](doi, output_path):
-        return {"success": True, "method": "arxiv", "filetype": "pdf"}
+        return _finish({"success": True, "method": "arxiv", "filetype": "pdf"})
 
     # Publisher TDM APIs
     if api_keys:
         if api_keys.get("SPRINGER_API_KEY") and FALLBACKS.get("springer"):
             if FALLBACKS["springer"](paper_metadata, output_path, api_keys):
-                return {"success": True, "method": "springer", "filetype": "pdf"}
+                return _finish(
+                    {"success": True, "method": "springer", "filetype": "pdf"}
+                )
         if api_keys.get("WILEY_TDM_API_TOKEN"):
             if FALLBACKS["wiley"](paper_metadata, output_path, api_keys):
-                return {"success": True, "method": "wiley", "filetype": "pdf"}
+                return _finish({"success": True, "method": "wiley", "filetype": "pdf"})
         if api_keys.get("ELSEVIER_TDM_API_KEY"):
             if FALLBACKS["elsevier"](
                 paper_metadata, output_path, api_keys, preferred_type=preferred_type
             ):
-                return {
-                    "success": True,
-                    "method": "elsevier",
-                    "filetype": preferred_type,
-                }
+                return _finish(
+                    {
+                        "success": True,
+                        "method": "elsevier",
+                        "filetype": preferred_type,
+                    }
+                )
 
     logger.warning(f"All download attempts failed for {doi}.")
     # --- Replace the previous "save abstract as .txt when all attempts failed" block with this ---
@@ -440,7 +464,7 @@ def save_pdf(
 
     if not abstract_text:
         logger.warning(f"Could not retrieve abstract for {doi}.")
-        return {"success": False, "method": None, "filetype": None}
+        return _finish({"success": False, "method": None, "filetype": None})
     else:
         try:
             with open(output_path.with_suffix(".txt"), "w", encoding="utf-8") as f:
@@ -449,42 +473,57 @@ def save_pdf(
         except Exception as e:
             logger.error(f"Failed to save abstract to {str(output_path)}: {e}")
         # Abstract saved, but not a full text
-        return {"success": False, "method": "abstract", "filetype": "txt"}
+        return _finish({"success": False, "method": "abstract", "filetype": "txt"})
 
 
-def save_pdf_from_dump(
+def save_file_from_dump(
     dump_path: str,
-    pdf_path: str,
+    output_path: Optional[str] = None,
     key_to_save: str = "doi",
     save_metadata: bool = False,
     api_keys: Optional[str] = None,
     preferred_type: str = "pdf",
     mail: Optional[str] = None,
+    to_markdown: bool = False,
+    pdf_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Receives a path to a `.jsonl` dump with paper metadata and saves the PDF files of
-    each paper.
+    Receives a path to a `.jsonl` dump with paper metadata and saves full-text
+    files for each paper (PDF and/or XML, optionally Markdown).
 
     Args:
         dump_path: Path to a `.jsonl` file with paper metadata, one paper per line.
-        pdf_path: Path to a folder where the files will be stored.
+        output_path: Path to a folder where the files will be stored.
         key_to_save: Key in the paper metadata to use as filename.
             Has to be `doi` or `title`. Defaults to `doi`.
         save_metadata: A boolean indicating whether to save paper metadata as a separate json.
         api_keys: Path to a file with API keys. If None, API-based fallbacks will be skipped.
         preferred_type: Preferred file type to download, 'pdf' or 'xml'. Defaults to 'pdf'.
         mail: Optional email address to use for Unpaywall API requests.
+        to_markdown: If True, convert each successful PDF/XML download to Markdown
+            (``.md`` beside the binary) via Firecrawl ``anydoc``. Requires
+            ``pip install 'paperscraper[markdown]'`` (Python >= 3.10).
+        pdf_path: Deprecated alias for ``output_path``.
     Returns:
-        A dict containing per-DOI results and counts. Also writes fallback_stats.json to pdf_path.
+        A dict containing per-DOI results and counts. Also writes fallback_stats.json
+        to ``output_path``.
     """
+
+    if output_path is None and pdf_path is None:
+        raise TypeError(
+            "save_file_from_dump() missing required argument: 'output_path'"
+        )
+    if output_path is not None and pdf_path is not None and output_path != pdf_path:
+        raise TypeError("Specify only one of output_path or pdf_path")
+    output_path = output_path if output_path is not None else pdf_path
 
     if not isinstance(dump_path, str):
         raise TypeError(f"dump_path must be a string, not {type(dump_path)}.")
     if not dump_path.endswith(".jsonl"):
         raise ValueError("Please provide a dump_path with .jsonl extension.")
 
-    if not isinstance(pdf_path, str):
-        raise TypeError(f"pdf_path must be a string, not {type(pdf_path)}.")
+    if not isinstance(output_path, str):
+        raise TypeError(f"output_path must be a string, not {type(output_path)}.")
 
     if not isinstance(key_to_save, str):
         raise TypeError(f"key_to_save must be a string, not {type(key_to_save)}.")
@@ -494,13 +533,16 @@ def save_pdf_from_dump(
         )
     if preferred_type not in ["pdf", "xml"]:
         raise ValueError("preferred_type must be one of 'pdf' or 'xml'.")
+    if not isinstance(to_markdown, bool):
+        raise TypeError(f"to_markdown must be a bool, not {type(to_markdown)}.")
 
     papers = load_jsonl(dump_path)
 
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
 
-    os.makedirs(pdf_path, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
+    target_dir = output_path
 
     results_by_doi: Dict[str, Dict[str, Any]] = {}
     counts_by_method: Dict[str, int] = {}
@@ -518,34 +560,50 @@ def save_pdf_from_dump(
             )
             continue
         filename = paper[key_to_save].replace("/", "_")
-        pdf_file = Path(os.path.join(pdf_path, f"{filename}.pdf"))
+        pdf_file = Path(os.path.join(target_dir, f"{filename}.pdf"))
         xml_file = pdf_file.with_suffix(".xml")
-        if pdf_file.exists():
-            logger.info(f"File {pdf_file} already exists. Skipping download.")
+        md_file = pdf_file.with_suffix(".md")
+        if pdf_file.exists() or xml_file.exists():
+            existing_type = "pdf" if pdf_file.exists() else "xml"
+            existing_path = pdf_file if pdf_file.exists() else xml_file
+            logger.info(f"File {existing_path} already exists. Skipping download.")
+            result = {
+                "success": True,
+                "method": "existing",
+                "filetype": existing_type,
+                "markdown": None,
+            }
+            if to_markdown:
+                md_path = maybe_convert_download(
+                    pdf_file, existing_type, to_markdown=True
+                )
+                result["markdown"] = str(md_path) if md_path else None
+                if md_path:
+                    counts_by_method["markdown"] = (
+                        counts_by_method.get("markdown", 0) + 1
+                    )
+            results_by_doi[paper["doi"]] = result
+            counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
+            continue
+        if md_file.exists() and to_markdown:
+            logger.info(f"File {md_file} already exists. Skipping download.")
             results_by_doi[paper["doi"]] = {
                 "success": True,
                 "method": "existing",
-                "filetype": "pdf",
+                "filetype": "md",
+                "markdown": str(md_file),
             }
             counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
             continue
-        if xml_file.exists():
-            logger.info(f"File {xml_file} already exists. Skipping download.")
-            results_by_doi[paper["doi"]] = {
-                "success": True,
-                "method": "existing",
-                "filetype": "xml",
-            }
-            counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
-            continue
-        output_path = str(pdf_file)
-        result = save_pdf(
+        paper_out = str(pdf_file)
+        result = save_file(
             paper,
-            output_path,
+            paper_out,
             save_metadata=save_metadata,
             api_keys=api_keys,
             preferred_type=preferred_type,
             mail=mail,
+            to_markdown=to_markdown,
         )
         doi = paper["doi"]
         results_by_doi[doi] = result
@@ -554,6 +612,10 @@ def save_pdf_from_dump(
                 counts_by_method[result["method"]] = (
                     counts_by_method.get(result["method"], 0) + 1
                 )
+                if result.get("markdown"):
+                    counts_by_method["markdown"] = (
+                        counts_by_method.get("markdown", 0) + 1
+                    )
             else:
                 # track abstract-only separately
                 if result.get("method") == "abstract":
@@ -570,7 +632,7 @@ def save_pdf_from_dump(
             "counts": counts_by_method,
             "by_doi": results_by_doi,
         }
-        stats_path = Path(pdf_path) / "fallback_stats.json"
+        stats_path = Path(target_dir) / "fallback_stats.json"
         with open(stats_path, "w", encoding="utf-8") as f:
             json.dump(stats, f, ensure_ascii=False, indent=2)
         logger.info(f"Saved fallback stats to {stats_path}")
@@ -645,7 +707,7 @@ def _wiley_allowed(
     return False
 
 
-def debug_save_pdf(
+def debug_save_file(
     paper_metadata: Dict[str, Any],
     filepath: Union[str, Path],
     api_keys: Optional[Union[str, Dict[str, str]]] = None,
@@ -667,10 +729,10 @@ def debug_save_pdf(
     successes = []
     per = {}
 
-    # Use a unique path for the initial direct check so save_pdf doesn't
+    # Use a unique path for the initial direct check so save_file doesn't
     # already save a fallback to the main output and interfere with later attempts.
     direct_check_path = Path(str(base_output) + ".direct_check")
-    direct_res = save_pdf(
+    direct_res = save_file(
         paper_metadata,
         direct_check_path,
         save_metadata=False,
@@ -708,6 +770,8 @@ def debug_save_pdf(
         try:
             if name == "unpaywall" and mail:
                 return FALLBACKS[name](doi, out, mail, None)
+            if name == "bioc_pmc":
+                return FALLBACKS[name](doi, out, mail or "your_email@example.com")
             if name in ("europepmc", "doaj", "openalex", "arxiv"):
                 return FALLBACKS[name](doi, out)
             if name == "crossref":
@@ -766,20 +830,31 @@ def debug_save_pdf(
 
 
 # python
-def debug_save_pdf_from_dump(
+def debug_save_file_from_dump(
     dump_path: str,
-    pdf_path: str,
+    output_path: Optional[str] = None,
     api_keys: Optional[str] = None,
     preferred_type: str = "pdf",
     mail: Optional[str] = None,
     save_first_only: bool = True,
     save_interval: int = 10,
+    pdf_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Debug variant for batch processing that tests all fallbacks per paper and records which work.
     Writes a debug_fallback_stats.json with detailed per-DOI outcomes.
     Saves intermediate stats every `save_interval` papers so partial results are available.
+
+    ``pdf_path`` is a deprecated alias for ``output_path``.
     """
+    if output_path is None and pdf_path is None:
+        raise TypeError(
+            "debug_save_file_from_dump() missing required argument: 'output_path'"
+        )
+    if output_path is not None and pdf_path is not None and output_path != pdf_path:
+        raise TypeError("Specify only one of output_path or pdf_path")
+    output_path = output_path if output_path is not None else pdf_path
+
     papers = load_jsonl(dump_path)
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
@@ -811,8 +886,8 @@ def debug_save_pdf_from_dump(
         if "doi" not in paper or not paper["doi"]:
             continue
         filename = paper["doi"].replace("/", "_")
-        out = str(Path(os.path.join(pdf_path, f"{filename}.pdf")))
-        res = debug_save_pdf(
+        out = str(Path(os.path.join(output_path, f"{filename}.pdf")))
+        res = debug_save_file(
             paper,
             out,
             api_keys=api_keys,
@@ -828,11 +903,18 @@ def debug_save_pdf_from_dump(
 
         # periodically save partial stats so you can inspect mid-run
         if save_interval > 0 and ((i + 1) % save_interval == 0):
-            _write_debug_stats(pdf_path, by_doi, counts)
+            _write_debug_stats(output_path, by_doi, counts)
 
     # write final debug stats
     try:
-        _write_debug_stats(pdf_path, by_doi, counts)
+        _write_debug_stats(output_path, by_doi, counts)
     except Exception as e:
         logger.error(f"Failed to write final debug fallback stats: {e}")
     return {"by_doi": by_doi, "counts": counts}
+
+
+# Backward-compatible aliases
+save_pdf = save_file
+save_pdf_from_dump = save_file_from_dump
+debug_save_pdf = debug_save_file
+debug_save_pdf_from_dump = debug_save_file_from_dump
