@@ -132,7 +132,7 @@ class TestPDF:
         with pytest.raises(ValueError):
             save_pdf(paper_metadata=paper_data, filepath="/nonexistent/output.pdf")
 
-    @patch("requests.get")
+    @patch("requests.Session.get")
     def test_network_issues_on_doi_url_request(self, mock_get, paper_data):
         if os.path.exists("output.pdf"):
             os.remove("output.pdf")
@@ -140,7 +140,7 @@ class TestPDF:
         save_pdf(paper_metadata=paper_data, filepath="output.pdf")
         assert not os.path.exists("output.pdf")
 
-    @patch("requests.get")
+    @patch("requests.Session.get")
     def test_missing_pdf_url_in_meta_tags(self, mock_get, paper_data):
         if os.path.exists("output.pdf"):
             os.remove("output.pdf")
@@ -150,7 +150,7 @@ class TestPDF:
         save_pdf(paper_metadata=paper_data, filepath="output.pdf")
         assert not os.path.exists("output.pdf")
 
-    @patch("requests.get")
+    @patch("requests.Session.get")
     def test_network_issues_on_pdf_url_request(self, mock_get, paper_data):
         if os.path.exists("output.pdf"):
             os.remove("output.pdf")
@@ -294,7 +294,7 @@ class TestPDF:
             assert result is True
             assert (output_path.with_suffix(".xml")).exists()
             with open(
-                output_path.with_suffix(".xml"), "r"
+                output_path.with_suffix(".xml"), "r", encoding="utf-8"
             ) as f:  # Check if the file contains XML data
                 content = f.read()
                 assert "<" in content and ">" in content  # Basic XML check
@@ -320,7 +320,7 @@ class TestPDF:
             assert result is True
             assert (output_path.with_suffix(".xml")).exists()
             with open(
-                output_path.with_suffix(".xml"), "r"
+                output_path.with_suffix(".xml"), "r", encoding="utf-8"
             ) as f:  # Check if the file contains XML data
                 content = f.read()
                 assert "<" in content and ">" in content  # Basic XML check
@@ -340,7 +340,7 @@ class TestPDF:
         assert result is False
         assert not os.path.exists(output_path.with_suffix(".xml"))
 
-    @patch("requests.get")
+    @patch("requests.Session.get")
     def test_fallback_wiley_api_mock(self, mock_get):
         """Test Wiley API fallback with mocked response."""
         mock_response = MagicMock()
@@ -357,7 +357,6 @@ class TestPDF:
                 "https://api.wiley.com/onlinelibrary/tdm/v1/articles/10.1002%2Fsmll.202309431",
                 headers={"Wiley-TDM-Client-Token": "test_token"},
                 allow_redirects=True,
-                timeout=60,
             )
             pdf_path = output_path.with_suffix(".pdf")
             assert os.path.exists(pdf_path)
@@ -380,7 +379,7 @@ class TestPDF:
         if result and output_path.with_suffix(".pdf").exists():
             os.remove(output_path.with_suffix(".pdf"))
 
-    @patch("requests.get")
+    @patch("requests.Session.get")
     def test_fallback_elsevier_api_mock(self, mock_get):
         """Test Elsevier API fallback with mocked response."""
         mock_response = MagicMock()
@@ -399,7 +398,6 @@ class TestPDF:
                     "Accept": "application/xml",
                     "X-ELS-APIKey": "test_key",
                 },
-                timeout=60,
             )
             xml_path = output_path.with_suffix(".xml")
             assert os.path.exists(xml_path)
