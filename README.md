@@ -187,8 +187,24 @@ save_pdf({"doi": "10.48550/arXiv.2207.03928"}, filepath="gt4sd_paper.pdf")
 
 Output: `True` when the file was saved.
 
+Optionally convert downloads to Markdown with Firecrawl
+[anydoc](https://pypi.org/project/firecrawl-anydoc/) (`pip install 'paperscraper[markdown]'`,
+Python >= 3.10):
+
+```py
+from paperscraper.pdf import save_pdf_from_dump
+
+save_pdf_from_dump(
+    "papers.jsonl",
+    pdf_path="papers",
+    key_to_save="doi",
+    to_markdown=True,  # also writes .md beside each PDF/XML
+)
+```
+
 See the [PDF retrieval example](https://jannisborn.github.io/paperscraper/examples/pdf-retrieval/)
-for batch downloads, fallbacks, publisher API keys, and downstream PDF analysis.
+for batch downloads, Markdown conversion, fallbacks, publisher API keys, and
+downstream PDF analysis.
 
 ### Scholar metrics analysis
 

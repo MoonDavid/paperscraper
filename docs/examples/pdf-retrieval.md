@@ -41,12 +41,54 @@ save_pdf_from_dump(
 
 `key_to_save` can be `"doi"`, `"title"`, or `"date"`.
 
+## Markdown conversion (optional)
+
+Install the optional extra (Python >= 3.10):
+
+```bash
+pip install 'paperscraper[markdown]'
+```
+
+This pulls in [Firecrawl anydoc](https://pypi.org/project/firecrawl-anydoc/)
+(`import anydoc`). Note: the older PyPI project named
+[`anydoc`](https://pypi.org/project/anydoc/) is unrelated (Slack Q&A bot).
+
+Pass `to_markdown=True` to write a `.md` file beside each successful PDF/XML:
+
+```py
+from paperscraper.pdf import save_pdf, save_pdf_from_dump
+
+save_pdf(
+    {"doi": "10.1073/pnas.1718406115"},
+    filepath="pnas_paper.pdf",
+    to_markdown=True,
+)
+
+save_pdf_from_dump(
+    "ai_quantum_chemistry.jsonl",
+    pdf_path="papers",
+    key_to_save="doi",
+    to_markdown=True,
+)
+```
+
+PDFs are converted with `anydoc.to_markdown`. XML full text uses a lightweight
+text extract (anydoc does not parse JATS/PMC XML). Convert an existing file
+directly:
+
+```py
+from paperscraper.pdf import convert_file_to_markdown
+
+convert_file_to_markdown("pnas_paper.pdf")  # writes pnas_paper.md
+```
+
 ## Fallbacks
 
 When direct PDF retrieval fails, `paperscraper` tries supported fallbacks:
 
 - BioC-PMC XML for open-access papers in PubMed Central.
 - eLife XML from the eLife article XML repository.
+- Europe PMC full-text XML, with PDF render when XML is unavailable.
 - Publisher APIs when matching credentials are available.
 - bioRxiv S3 access when AWS requester-pays credentials are provided.
 
@@ -98,4 +140,5 @@ Retrieved PDFs can be passed to document conversion and analysis tools. For
 example, [Docling](https://github.com/docling-project/docling) can convert PDFs
 into structured text/Markdown for downstream extraction, indexing, or RAG
 pipelines. See the [Docling technical report](https://arxiv.org/abs/2408.09869)
-for details.
+for details. With `paperscraper[markdown]`, prefer the built-in `to_markdown`
+option powered by Firecrawl anydoc.

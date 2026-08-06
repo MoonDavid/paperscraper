@@ -465,3 +465,73 @@ class TestPDF:
                 p = output_path.with_suffix(suf)
                 if p.exists():
                     os.remove(p)
+
+    def test_convert_file_to_markdown_pdf(self):
+        """Convert a tiny synthetic PDF is hard; use a live PNAS PDF if present."""
+        pytest.importorskip("anydoc")
+        from paperscraper.pdf.markdown import convert_file_to_markdown
+
+        pdf = Path("artifacts/pnas_download/pnas.1718406115.pdf")
+        if not pdf.exists():
+            # Download via Europe PMC for the conversion check
+            out = Path("test_md_source")
+            assert FALLBACKS["europepmc"]("10.1073/pnas.1718406115", out)
+            pdf = out.with_suffix(".pdf")
+        md_path = Path("test_pnas_converted.md")
+        try:
+            result = convert_file_to_markdown(pdf, md_path, overwrite=True)
+            assert result == md_path
+            assert md_path.exists()
+            text = md_path.read_text(encoding="utf-8")
+            assert len(text) > 1000
+            assert "RNA" in text or "Transcriptome" in text or "PNAS" in text
+        finally:
+            if md_path.exists():
+                os.remove(md_path)
+            for suf in (".pdf", ".xml"):
+                p = Path("test_md_source").with_suffix(suf)
+                if p.exists():
+                    os.remove(p)
+
+    def test_save_pdf_to_markdown_option(self, tmp_path):
+        pytest.importorskip("anydoc")
+        out = tmp_path / "pnas_md.pdf"
+        result = save_pdf(
+            {"doi": "10.1073/pnas.1718406115"},
+            filepath=out,
+            to_markdown=True,
+        )
+        assert result["success"] is True
+        assert result["filetype"] == "pdf"
+        assert result["markdown"]
+        md = Path(result["markdown"])
+        assert md.exists()
+        assert md.read_text(encoding="utf-8").strip()
+
+    def test_save_pdf_from_dump_to_markdown(self, tmp_path):
+        pytest.importorskip("anydoc")
+        dump = tmp_path / "one.jsonl"
+        dump.write_text(
+            '{"doi": "10.1073/pnas.1718406115", "title": "pnas"}\n',
+            encoding="utf-8",
+        )
+        out_dir = tmp_path / "pdfs"
+        stats = save_pdf_from_dump(
+            str(dump),
+            pdf_path=str(out_dir),
+            key_to_save="doi",
+            to_markdown=True,
+        )
+        assert stats["counts"].get("markdown", 0) >= 1
+        md_files = list(out_dir.glob("*.md"))
+        assert md_files
+        assert md_files[0].stat().st_size > 1000
+
+    def test_to_markdown_requires_bool(self):
+        with pytest.raises(TypeError):
+            save_pdf_from_dump(
+                TEST_FILE_PATH,
+                pdf_path=SAVE_PATH,
+                key_to_save="doi",
+                to_markdown="yes",
+            )
