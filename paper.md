@@ -57,7 +57,7 @@ For arXiv, users can either query the API or build a local dump from the [arXiv 
 
 ## PDF retrieval
 
-Full-text retrieval is implemented as a best-effort DOI workflow. `save_pdf` first resolves the DOI landing page, then tries direct preprint or publisher PDF links where available. If direct retrieval fails, supported fallbacks include [BioC-PMC XML](https://www.ncbi.nlm.nih.gov/research/bionlp/APIs/BioC-PMC/), eLife XML, publisher text-and-data-mining APIs when credentials are provided, and [bioRxiv S3 requester-pays access](https://www.biorxiv.org/tdm). These methods do not bypass paywalls or publisher restrictions; they only automate retrieval paths available to the user.
+Full-text retrieval is implemented as a best-effort DOI workflow. `save_file` first resolves the DOI landing page, then tries direct preprint or publisher PDF links where available. If direct retrieval fails, supported fallbacks include [BioC-PMC XML](https://www.ncbi.nlm.nih.gov/research/bionlp/APIs/BioC-PMC/), eLife XML, publisher text-and-data-mining APIs when credentials are provided, and [bioRxiv S3 requester-pays access](https://www.biorxiv.org/tdm). These methods do not bypass paywalls or publisher restrictions; they only automate retrieval paths available to the user.
 
 ## Scholar metrics analysis
 

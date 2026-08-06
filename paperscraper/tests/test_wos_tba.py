@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from paperscraper.pdf import save_pdf_from_dump
+from paperscraper.pdf import save_file_from_dump
 from paperscraper.utils import (
     is_wos_tba_file,
     load_papers_dump,
@@ -45,7 +45,7 @@ class TestWosTba:
         with pytest.raises(ValueError):
             load_wos_tba(str(bad))
 
-    def test_save_pdf_from_wos_tba(self):
+    def test_save_file_from_wos_tba(self):
         os.makedirs(SAVE_PATH, exist_ok=True)
         # Only download the first record to keep the test fast: write a 1-row TBA.
         import csv
@@ -62,7 +62,7 @@ class TestWosTba:
             writer.writeheader()
             writer.writerow(first)
 
-        stats = save_pdf_from_dump(
+        stats = save_file_from_dump(
             str(one_row),
             pdf_path=SAVE_PATH,
             key_to_save="doi",

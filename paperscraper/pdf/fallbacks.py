@@ -1024,24 +1024,115 @@ def fallback_plos_api(doi: str, output_path: Path) -> bool:
         return False
 
 
-def fallback_europepmc(doi: str, output_path: Path) -> bool:
+def _europepmc_pdf_urls_from_result(result: Dict[str, Any], pmcid: Optional[str]) -> list:
+    """Collect candidate PDF URLs from a Europe PMC search result."""
+    urls: list = []
+    # Prefer Europe PMC's own PDF render endpoint when a PMCID is available.
+    if pmcid:
+        urls.append(
+            f"https://europepmc.org/backend/ptpmcrender.fcgi?accid={pmcid}&blobtype=pdf"
+        )
+        urls.append(f"https://europepmc.org/articles/{pmcid}?pdf=render")
+
+    full_text = (result.get("fullTextUrlList") or {}).get("fullTextUrl") or []
+    if isinstance(full_text, dict):
+        full_text = [full_text]
+    for entry in full_text:
+        if not isinstance(entry, dict):
+            continue
+        style = str(entry.get("documentStyle") or "").lower()
+        url = entry.get("url")
+        if not url or style != "pdf":
+            continue
+        # Prefer OA / free links; still keep other free-ish codes as candidates.
+        availability = str(entry.get("availabilityCode") or "").upper()
+        if availability in ("OA", "F", "U", "") or style == "pdf":
+            if url not in urls:
+                urls.append(url)
+    return urls
+
+
+def _europepmc_try_pdf(doi: str, output_path: Path, pdf_urls: list) -> bool:
+    """Download the first valid PDF from candidate Europe PMC URLs."""
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/91.0.4472.124 Safari/537.36"
+        ),
+        "Accept": "application/pdf,*/*",
+    }
+    for pdf_url in pdf_urls:
+        try:
+            _europepmc_rate_limiter.wait()
+            response = get_session().get(
+                pdf_url, headers=headers, allow_redirects=True, timeout=60
+            )
+            response.raise_for_status()
+            content = response.content
+            if _write_pdf_bytes(output_path, content):
+                logger.info(
+                    f"Successfully downloaded PDF from Europe PMC for DOI {doi} "
+                    f"to {output_path.with_suffix('.pdf')}."
+                )
+                return True
+            logger.info(
+                f"Europe PMC PDF candidate for {doi} was not a valid PDF: {pdf_url}"
+            )
+        except Exception as pdf_err:
+            logger.info(f"Europe PMC PDF candidate failed for {doi}: {pdf_err}")
+    return False
+
+
+def _europepmc_try_xml(doi: str, output_path: Path, pmcid: str) -> bool:
+    """Download full-text XML for a PMCID from Europe PMC."""
+    xml_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML"
+    try:
+        _europepmc_rate_limiter.wait()
+        xml_response = get_session().get(xml_url)
+        xml_response.raise_for_status()
+
+        xml_content = xml_response.content
+        if xml_content.startswith(b"<?xml") or xml_content.startswith(b"<"):
+            xml_path = output_path.with_suffix(".xml")
+            with open(xml_path, "wb") as f:
+                f.write(xml_content)
+            logger.info(
+                f"Successfully downloaded XML from Europe PMC for DOI {doi} to {xml_path}."
+            )
+            return True
+        logger.warning(f"Europe PMC did not return valid XML for DOI {doi}.")
+        return False
+    except Exception as xml_err:
+        logger.error(f"Failed to download XML from Europe PMC for DOI {doi}: {xml_err}")
+        return False
+
+
+def fallback_europepmc(
+    doi: str, output_path: Path, preferred_type: str = "pdf"
+) -> bool:
     """
-    Attempt to download the XML via Europe PMC.
+    Attempt to download full text via Europe PMC.
 
-    This function first converts a given DOI to a PMCID using the Europe PMC REST API.
-    If a PMCID is found, it attempts to download the full-text XML from Europe PMC.
-
-    Europe PMC is a repository of biomedical and life sciences literature that provides
-    free access to abstracts and full-text articles.
+    Resolves DOI → PMCID via the Europe PMC REST API, then:
+    - preferred_type="pdf": try OA PDF first (render endpoint + fullTextUrlList),
+      then fall back to full-text XML.
+    - preferred_type="xml": download full-text XML only.
 
     Args:
-        doi (str): The DOI of the paper to retrieve.
-        output_path (Path): A pathlib.Path object representing the path where the XML file will be saved.
+        doi: The DOI of the paper to retrieve.
+        output_path: Path stem where the PDF/XML file will be saved.
+        preferred_type: ``"pdf"`` (default) or ``"xml"``.
 
     Returns:
-        bool: True if the XML file was successfully downloaded, False otherwise.
+        True if a full-text file was successfully downloaded, False otherwise.
     """
-    # First, search for the article using DOI to get PMCID
+    if preferred_type not in ("pdf", "xml"):
+        logger.warning(
+            f"Invalid preferred_type '{preferred_type}' for Europe PMC. Defaulting to 'pdf'."
+        )
+        preferred_type = "pdf"
+
     search_url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
     search_params = {"query": f'DOI:"{doi}"', "format": "json", "resultType": "core"}
 
@@ -1056,51 +1147,54 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
             logger.warning(f"No results found for DOI {doi} in Europe PMC.")
             return False
 
-        # Search through all results to find one with a PMCID
-        pmcid = None
+        # Prefer a result that has a PMCID (needed for XML / render PDF).
+        matched: Optional[Dict[str, Any]] = None
+        pmcid: Optional[str] = None
         for result in results:
             candidate_pmcid = result.get("pmcid")
             if candidate_pmcid:
+                matched = result
                 pmcid = candidate_pmcid
                 logger.info(
-                    f"Found PMCID {pmcid} for DOI {doi} in Europe PMC (result {results.index(result) + 1} of {len(results)})."
+                    f"Found PMCID {pmcid} for DOI {doi} in Europe PMC "
+                    f"(result {results.index(result) + 1} of {len(results)})."
                 )
                 break
 
+        if matched is None:
+            matched = results[0]
+            pmcid = matched.get("pmcid")
+
+        if preferred_type == "pdf":
+            pdf_urls = _europepmc_pdf_urls_from_result(matched, pmcid)
+            # Also harvest PDF links from other DOI hits that lack a PMCID.
+            for result in results:
+                if result is matched:
+                    continue
+                for url in _europepmc_pdf_urls_from_result(result, result.get("pmcid")):
+                    if url not in pdf_urls:
+                        pdf_urls.append(url)
+            if pdf_urls and _europepmc_try_pdf(doi, output_path, pdf_urls):
+                return True
+            if not pmcid:
+                logger.warning(
+                    f"No PMCID / PDF available for DOI {doi} in Europe PMC "
+                    f"(searched {len(results)} results)."
+                )
+                return False
+            # PDF preferred but unavailable — still accept XML full text.
+            return _europepmc_try_xml(doi, output_path, pmcid)
+
         if not pmcid:
             logger.warning(
-                f"No PMCID available for DOI {doi} in Europe PMC (searched {len(results)} results)."
+                f"No PMCID available for DOI {doi} in Europe PMC "
+                f"(searched {len(results)} results)."
             )
             return False
+        return _europepmc_try_xml(doi, output_path, pmcid)
 
     except Exception as search_err:
         logger.error(f"Error searching Europe PMC for DOI {doi}: {search_err}")
-        return False
-
-    # Download full-text XML using PMCID
-    xml_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML"
-
-    try:
-        _europepmc_rate_limiter.wait()
-        xml_response = get_session().get(xml_url)
-        xml_response.raise_for_status()
-
-        # Check if we got valid XML content
-        xml_content = xml_response.content
-        if xml_content.startswith(b"<?xml") or xml_content.startswith(b"<"):
-            xml_path = output_path.with_suffix(".xml")
-            with open(xml_path, "wb") as f:
-                f.write(xml_content)
-            logger.info(
-                f"Successfully downloaded XML from Europe PMC for DOI {doi} to {xml_path}."
-            )
-            return True
-        else:
-            logger.warning(f"Europe PMC did not return valid XML for DOI {doi}.")
-            return False
-
-    except Exception as xml_err:
-        logger.error(f"Failed to download XML from Europe PMC for DOI {doi}: {xml_err}")
         return False
 
 

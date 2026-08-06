@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from paperscraper.pdf import load_api_keys, save_pdf, save_pdf_from_dump
+from paperscraper.pdf import load_api_keys, save_file, save_file_from_dump
 from paperscraper.pdf.fallbacks import FALLBACKS
 
 logging.disable(logging.INFO)
@@ -23,7 +23,7 @@ class TestPDF:
 
     def test_basic_search(self):
         paper_data = {"doi": "10.48550/arXiv.2207.03928"}
-        save_pdf(paper_data, filepath="gt4sd.pdf", save_metadata=True)
+        save_file(paper_data, filepath="gt4sd.pdf", save_metadata=True)
         assert os.path.exists("gt4sd.pdf")
         assert os.path.exists("gt4sd.json")
         os.remove("gt4sd.pdf")
@@ -31,7 +31,7 @@ class TestPDF:
 
         # chemrxiv
         paper_data = {"doi": "10.26434/chemrxiv-2021-np7xj-v4"}
-        save_pdf(paper_data, filepath="kinases.pdf", save_metadata=True)
+        save_file(paper_data, filepath="kinases.pdf", save_metadata=True)
         assert os.path.exists("kinases.pdf")
         assert os.path.exists("kinases.json")
         os.remove("kinases.pdf")
@@ -46,7 +46,7 @@ class TestPDF:
         # S3 routine requires AWS credentials in api_keys.txt / env
         keys = load_api_keys("api_keys.txt")
         if keys.get("AWS_ACCESS_KEY_ID") and keys.get("AWS_SECRET_ACCESS_KEY"):
-            save_pdf(
+            save_file(
                 {"doi": "10.1101/786871"},
                 filepath="taskload.pdf",
                 save_metadata=False,
@@ -70,7 +70,7 @@ class TestPDF:
 
         # medrxiv now also seems cloudflare-controlled. skipping test
         # paper_data = {"doi": "10.1101/2020.09.02.20187096"}
-        # save_pdf(paper_data, filepath="medrxiv_review.pdf", save_metadata=True)
+        # save_file(paper_data, filepath="medrxiv_review.pdf", save_metadata=True)
         # assert os.path.exists("medrxiv_review.pdf")
         # assert os.path.exists("medrxiv_review.json")
         # os.remove("medrxiv_review.pdf")
@@ -78,7 +78,7 @@ class TestPDF:
 
         # journal with OA paper
         paper_data = {"doi": "10.1038/s42256-023-00639-z"}
-        save_pdf(paper_data, filepath="regression_transformer", save_metadata=True)
+        save_file(paper_data, filepath="regression_transformer", save_metadata=True)
         assert os.path.exists("regression_transformer.pdf")
         assert os.path.exists("regression_transformer.json")
         os.remove("regression_transformer.pdf")
@@ -87,7 +87,7 @@ class TestPDF:
         # Book chapter: publisher PDF is paywalled, but an OA preprint may still
         # be retrieved via fallbacks (e.g. arXiv).
         paper_data = {"doi": "10.1007/978-981-97-4828-0_7"}
-        res = save_pdf(paper_data, filepath="clm_chapter", save_metadata=True)
+        res = save_file(paper_data, filepath="clm_chapter", save_metadata=True)
         assert res.get("method") != "direct"
         if res.get("success"):
             assert os.path.exists("clm_chapter.pdf")
@@ -99,45 +99,45 @@ class TestPDF:
 
         # journal without OA paper
         paper_data = {"doi": "10.1126/science.adk9587"}
-        save_pdf(paper_data, filepath="color", save_metadata=True)
+        save_file(paper_data, filepath="color", save_metadata=True)
         assert not os.path.exists("color.pdf")
         assert not os.path.exists("color.json")
 
     def test_missing_doi(self):
         with pytest.raises(KeyError):
             paper_data = {"title": "Sample Paper"}
-            save_pdf(paper_data, "sample_paper.pdf")
+            save_file(paper_data, "sample_paper.pdf")
 
     def test_invalid_metadata_type(self):
         with pytest.raises(TypeError):
-            save_pdf(paper_metadata="not_a_dict", filepath="output.pdf")
+            save_file(paper_metadata="not_a_dict", filepath="output.pdf")
 
     def test_missing_doi_key(self):
         with pytest.raises(KeyError):
-            save_pdf(paper_metadata={}, filepath="output.pdf")
+            save_file(paper_metadata={}, filepath="output.pdf")
 
     def test_invalid_filepath_type(self):
         with pytest.raises(TypeError):
-            save_pdf(paper_metadata=self.paper_data, filepath=123)
+            save_file(paper_metadata=self.paper_data, filepath=123)
 
     def test_incorrect_filepath_extension(self):
         with pytest.raises(TypeError):
-            save_pdf(paper_metadata=self.paper_data, filepath="output.txt")
+            save_file(paper_metadata=self.paper_data, filepath="output.txt")
 
     def test_incorrect_filepath_type(self):
         with pytest.raises(TypeError):
-            save_pdf(paper_metadata=list(self.paper_data), filepath="output.txt")
+            save_file(paper_metadata=list(self.paper_data), filepath="output.txt")
 
     def test_nonexistent_directory_in_filepath(self, paper_data):
         with pytest.raises(ValueError):
-            save_pdf(paper_metadata=paper_data, filepath="/nonexistent/output.pdf")
+            save_file(paper_metadata=paper_data, filepath="/nonexistent/output.pdf")
 
     @patch("requests.Session.get")
     def test_network_issues_on_doi_url_request(self, mock_get, paper_data):
         if os.path.exists("output.pdf"):
             os.remove("output.pdf")
         mock_get.side_effect = Exception("Network error")
-        save_pdf(paper_metadata=paper_data, filepath="output.pdf")
+        save_file(paper_metadata=paper_data, filepath="output.pdf")
         assert not os.path.exists("output.pdf")
 
     @patch("requests.Session.get")
@@ -147,7 +147,7 @@ class TestPDF:
         response = MagicMock()
         response.text = "<html></html>"
         mock_get.return_value = response
-        save_pdf(paper_metadata=paper_data, filepath="output.pdf")
+        save_file(paper_metadata=paper_data, filepath="output.pdf")
         assert not os.path.exists("output.pdf")
 
     @patch("requests.Session.get")
@@ -159,44 +159,44 @@ class TestPDF:
             '<meta name="citation_pdf_url" content="http://valid.url/document.pdf">'
         )
         mock_get.side_effect = [response_doi, Exception("Network error")]
-        save_pdf(paper_metadata=paper_data, filepath="output.pdf")
+        save_file(paper_metadata=paper_data, filepath="output.pdf")
         assert not os.path.exists("output.pdf")
 
-    def test_save_pdf_from_dump_wrong_type(self):
+    def test_save_file_from_dump_wrong_type(self):
         with pytest.raises(TypeError):
-            save_pdf_from_dump(-1, pdf_path=SAVE_PATH, key_to_save="doi")
+            save_file_from_dump(-1, pdf_path=SAVE_PATH, key_to_save="doi")
 
-    def test_save_pdf_from_dump_wrong_output_type(self):
+    def test_save_file_from_dump_wrong_output_type(self):
         with pytest.raises(TypeError):
-            save_pdf_from_dump(TEST_FILE_PATH, pdf_path=1, key_to_save="doi")
+            save_file_from_dump(TEST_FILE_PATH, pdf_path=1, key_to_save="doi")
 
-    def test_save_pdf_from_dump_wrong_suffix(self):
+    def test_save_file_from_dump_wrong_suffix(self):
         with pytest.raises(ValueError):
-            save_pdf_from_dump(
+            save_file_from_dump(
                 TEST_FILE_PATH.replace("jsonl", "json"),
                 pdf_path=SAVE_PATH,
                 key_to_save="doi",
             )
 
-    def test_save_pdf_from_dump_wrong_key(self):
+    def test_save_file_from_dump_wrong_key(self):
         with pytest.raises(ValueError):
-            save_pdf_from_dump(TEST_FILE_PATH, pdf_path=SAVE_PATH, key_to_save="doix")
+            save_file_from_dump(TEST_FILE_PATH, pdf_path=SAVE_PATH, key_to_save="doix")
 
-    def test_save_pdf_from_dump_wrong_key_type(self):
+    def test_save_file_from_dump_wrong_key_type(self):
         with pytest.raises(TypeError):
-            save_pdf_from_dump(TEST_FILE_PATH, pdf_path=SAVE_PATH, key_to_save=["doix"])
+            save_file_from_dump(TEST_FILE_PATH, pdf_path=SAVE_PATH, key_to_save=["doix"])
 
-    def test_save_pdf_from_dump(self):
+    def test_save_file_from_dump(self):
         os.makedirs(SAVE_PATH, exist_ok=True)
-        save_pdf_from_dump(TEST_FILE_PATH, pdf_path=SAVE_PATH, key_to_save="doi")
+        save_file_from_dump(TEST_FILE_PATH, pdf_path=SAVE_PATH, key_to_save="doi")
         shutil.rmtree(SAVE_PATH)
 
     def test_api_keys_none_pmc(self):
-        """Test that save_pdf works properly even when no API keys are provided. Paper in PMC."""
+        """Test that save_file works properly even when no API keys are provided. Paper in PMC."""
         test_doi = {"doi": "10.1038/s41587-022-01613-7"}  # DOI known to be in PMC
         filename = SAVE_PATH + "_pmc"
         # Call function with no API keys
-        save_pdf(test_doi, filepath=filename, api_keys=None)
+        save_file(test_doi, filepath=filename, api_keys=None)
 
         # Verify file was created - with .xml extension from PMC fallback
         assert os.path.exists(filename + ".xml"), (
@@ -205,11 +205,11 @@ class TestPDF:
         os.remove(filename + ".xml")
 
     def test_api_keys_none_oa(self):
-        """Test that save_pdf works properly even when no API keys are provided. Paper available open-access."""
+        """Test that save_file works properly even when no API keys are provided. Paper available open-access."""
         test_doi = {"doi": "10.1038/s42256-023-00639-z"}  # DOI known to be OA
         filename = SAVE_PATH + "_oa"
         # Call function with no API keys
-        save_pdf(test_doi, filepath=filename, api_keys=None)
+        save_file(test_doi, filepath=filename, api_keys=None)
 
         # Verify file was created - with .pdf extension for direct PDF download
         assert os.path.exists(filename + ".pdf"), (
@@ -221,7 +221,7 @@ class TestPDF:
         test_doi = {"doi": "10.1002/smll.202309431"}  # Use a DOI from Wiley
         with open("tmp_keyfile.txt", "w") as f:
             f.write("WILEY_TDM_API_TOKEN=INVALID_TEST_KEY_123")
-        save_pdf(test_doi, filepath=SAVE_PATH, api_keys="tmp_keyfile.txt")
+        save_file(test_doi, filepath=SAVE_PATH, api_keys="tmp_keyfile.txt")
         os.remove("tmp_keyfile.txt")
 
     def test_api_key_env(self):
@@ -229,7 +229,7 @@ class TestPDF:
         with patch.dict(
             os.environ, {"WILEY_TDM_API_TOKEN": "ANOTHER_INVALID_TEST_KEY"}
         ):
-            save_pdf(test_doi, filepath=SAVE_PATH, api_keys=None)
+            save_file(test_doi, filepath=SAVE_PATH, api_keys=None)
 
     @pytest.mark.skipif(
         os.getenv("INSTITUTIONAL_NETWORK") != "1",
@@ -243,7 +243,7 @@ class TestPDF:
         try:
             with open(wiley_key_path, "w") as f:
                 f.write("WILEY_TDM_API_TOKEN=INVALID_TEST_KEY_123")
-            save_pdf(test_doi, filepath=filename, api_keys=wiley_key_path)
+            save_file(test_doi, filepath=filename, api_keys=wiley_key_path)
             # Verify file was created - with .pdf extension for Wiley content
             assert os.path.exists(filename + ".pdf"), (
                 "PDF file was not created for Wiley content"
@@ -269,7 +269,7 @@ class TestPDF:
             f.write(line)
 
         try:
-            save_pdf(test_doi, filepath=filename, api_keys=None)
+            save_file(test_doi, filepath=filename, api_keys=None)
 
             # Verify file was created - with .pdf extension for Wiley content
             assert os.path.exists(filename + ".pdf"), (
@@ -310,6 +310,54 @@ class TestPDF:
         result = FALLBACKS["bioc_pmc"](test_doi, output_path)
         assert result is False
         assert not os.path.exists(output_path.with_suffix(".xml"))
+
+    @patch("paperscraper.pdf.fallbacks.get_session")
+    def test_fallback_europepmc_prefers_pdf(self, mock_get_session):
+        """Europe PMC should try PDF before falling back to XML."""
+        session = MagicMock()
+        mock_get_session.return_value = session
+
+        search_response = MagicMock()
+        search_response.raise_for_status = MagicMock()
+        search_response.json.return_value = {
+            "resultList": {
+                "result": [
+                    {
+                        "pmcid": "PMC4595337",
+                        "fullTextUrlList": {
+                            "fullTextUrl": [
+                                {
+                                    "availabilityCode": "OA",
+                                    "documentStyle": "pdf",
+                                    "url": "https://example.com/paper.pdf",
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        }
+
+        pdf_response = MagicMock()
+        pdf_response.raise_for_status = MagicMock()
+        pdf_response.content = b"%PDF-1.4 fake pdf content"
+        session.get.side_effect = [search_response, pdf_response]
+
+        output_path = Path("test_europepmc_pdf")
+        try:
+            result = FALLBACKS["europepmc"](
+                "10.1371/journal.pone.0139731", output_path, preferred_type="pdf"
+            )
+            assert result is True
+            assert output_path.with_suffix(".pdf").exists()
+            assert not output_path.with_suffix(".xml").exists()
+            with open(output_path.with_suffix(".pdf"), "rb") as f:
+                assert f.read().startswith(b"%PDF")
+        finally:
+            for suffix in (".pdf", ".xml"):
+                path = output_path.with_suffix(suffix)
+                if path.exists():
+                    os.remove(path)
 
     def test_fallback_elife_xml_real_api(self):
         """Test the eLife XML fallback with a real API call."""

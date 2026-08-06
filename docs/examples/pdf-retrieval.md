@@ -9,9 +9,9 @@ publisher pages, and institutional/API access.
 Download a single paper by DOI:
 
 ```pycon
->>> from paperscraper.pdf import save_pdf
+>>> from paperscraper.pdf import save_file
 >>> paper = {"doi": "10.48550/arXiv.2207.03928"}
->>> save_pdf(paper, filepath="gt4sd_paper.pdf")
+>>> save_file(paper, filepath="gt4sd_paper.pdf")
 True
 ```
 
@@ -21,7 +21,7 @@ file next to the requested path when XML full text is the available format.
 Pass `save_metadata=True` to store paper metadata next to the downloaded file:
 
 ```pycon
->>> save_pdf(paper, filepath="gt4sd_paper.pdf", save_metadata=True)
+>>> save_file(paper, filepath="gt4sd_paper.pdf", save_metadata=True)
 True
 ```
 
@@ -30,9 +30,9 @@ True
 Download PDFs or XMLs from a metadata dump:
 
 ```py
-from paperscraper.pdf import save_pdf_from_dump
+from paperscraper.pdf import save_file_from_dump
 
-save_pdf_from_dump(
+save_file_from_dump(
     "ai_quantum_chemistry.jsonl",
     pdf_path="papers",
     key_to_save="doi",
@@ -43,13 +43,13 @@ save_pdf_from_dump(
 
 ### Web of Science tab-delimited exports
 
-`save_pdf_from_dump` also accepts Web of Science **Tab-delimited (Win, UTF-8)**
+`save_file_from_dump` also accepts Web of Science **Tab-delimited (Win, UTF-8)**
 exports (usually named `savedrecs.txt`):
 
 ```py
-from paperscraper.pdf import save_pdf_from_dump
+from paperscraper.pdf import save_file_from_dump
 
-save_pdf_from_dump(
+save_file_from_dump(
     "savedrecs.txt",
     pdf_path="wos_pdfs",
     key_to_save="doi",
@@ -72,7 +72,7 @@ wos_tba_to_jsonl("savedrecs.txt", "savedrecs.jsonl")
 To download **both PDF and XML** when available:
 
 ```py
-save_pdf_from_dump(
+save_file_from_dump(
     "ai_quantum_chemistry.jsonl",
     pdf_path="papers",
     key_to_save="doi",
@@ -84,9 +84,9 @@ save_pdf_from_dump(
 Or for a single paper:
 
 ```py
-from paperscraper.pdf import save_pdf_and_xml
+from paperscraper.pdf import save_file_and_xml
 
-save_pdf_and_xml(
+save_file_and_xml(
     {"doi": "10.1038/s41598-023-32245-9"},
     filepath="paper",
     mail="you@institution.edu",
@@ -97,6 +97,7 @@ save_pdf_and_xml(
 
 When direct PDF retrieval fails, `paperscraper` tries supported fallbacks:
 
+- Europe PMC: OA PDF when available, otherwise full-text XML.
 - BioC-PMC XML for open-access papers in PubMed Central.
 - eLife XML from the eLife article XML repository.
 - Publisher APIs when matching credentials are available.
@@ -121,7 +122,7 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
 Then pass the path when downloading from a dump:
 
 ```py
-save_pdf_from_dump(
+save_file_from_dump(
     "pubmed_query_results.jsonl",
     pdf_path="papers",
     key_to_save="doi",
@@ -132,10 +133,10 @@ save_pdf_from_dump(
 Or load the keys once and reuse them across calls:
 
 ```py
-from paperscraper.pdf import load_api_keys, save_pdf
+from paperscraper.pdf import load_api_keys, save_file
 
 api_keys = load_api_keys("api_keys.txt")
-save_pdf(
+save_file(
     {"doi": "10.1101/786871"},
     filepath="taskload.pdf",
     api_keys=api_keys,

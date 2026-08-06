@@ -199,10 +199,10 @@ def _get_abstract_europepmc(doi: str, timeout: int = 20) -> Optional[str]:
         return None
 
 
-# --- Replace abstract retrieval section in save_pdf with the following block ---
+# --- Replace abstract retrieval section in save_file with the following block ---
 
 
-def save_pdf(
+def save_file(
     paper_metadata: Dict[str, Any],
     filepath: Union[str, Path],
     save_metadata: bool = False,
@@ -225,7 +225,7 @@ def save_pdf(
         A dict summary: {success: bool, method: str|None, filetype: 'pdf'|'xml'|None}
     """
     if preferred_type == "both":
-        return save_pdf_and_xml(
+        return save_file_and_xml(
             paper_metadata=paper_metadata,
             filepath=filepath,
             save_metadata=save_metadata,
@@ -247,7 +247,7 @@ def save_pdf(
     if not output_path.parent.exists():
         raise ValueError(f"The folder: {output_path.parent} seems to not exist.")
 
-    # load API keys from file if not already loaded via in save_pdf_from_dump (dict)
+    # load API keys from file if not already loaded via in save_file_from_dump (dict)
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
     doi = paper_metadata["doi"]
@@ -379,8 +379,9 @@ def save_pdf(
     if mail and FALLBACKS["unpaywall"](doi, output_path, mail, final_url):
         return {"success": True, "method": "unpaywall", "filetype": "pdf"}
 
-    if FALLBACKS["europepmc"](doi, output_path):
-        return {"success": True, "method": "europepmc", "filetype": "xml"}
+    if FALLBACKS["europepmc"](doi, output_path, preferred_type=preferred_type):
+        filetype = "pdf" if output_path.with_suffix(".pdf").exists() else "xml"
+        return {"success": True, "method": "europepmc", "filetype": filetype}
 
     if FALLBACKS["bioc_pmc"](doi, output_path, mail or "your_email@example.com"):
         return {"success": True, "method": "bioc_pmc", "filetype": "xml"}
@@ -525,7 +526,7 @@ def _try_download_xml(
     doi = paper_metadata["doi"]
     contact = mail or "your_email@example.com"
 
-    if FALLBACKS["europepmc"](doi, output_path):
+    if FALLBACKS["europepmc"](doi, output_path, preferred_type="xml"):
         return {"success": True, "method": "europepmc", "filetype": "xml"}
     if FALLBACKS["bioc_pmc"](doi, output_path, contact):
         return {"success": True, "method": "bioc_pmc", "filetype": "xml"}
@@ -542,7 +543,7 @@ def _try_download_xml(
     return {"success": False, "method": None, "filetype": None}
 
 
-def save_pdf_and_xml(
+def save_file_and_xml(
     paper_metadata: Dict[str, Any],
     filepath: Union[str, Path],
     save_metadata: bool = False,
@@ -577,7 +578,7 @@ def save_pdf_and_xml(
         pdf_result = {"success": True, "method": "existing", "filetype": "pdf"}
     else:
         # Prefer PDF sources; may still land an XML via PMC fallbacks.
-        pdf_result = save_pdf(
+        pdf_result = save_file(
             paper_metadata,
             filepath=output_path,
             save_metadata=save_metadata,
@@ -637,7 +638,7 @@ def save_pdf_and_xml(
     }
 
 
-def save_pdf_from_dump(
+def save_file_from_dump(
     dump_path: str,
     pdf_path: str,
     key_to_save: str = "doi",
@@ -788,7 +789,7 @@ def save_pdf_from_dump(
                 )
                 return
 
-        result = save_pdf(
+        result = save_file(
             paper,
             str(pdf_file),
             save_metadata=save_metadata,
@@ -1078,7 +1079,7 @@ def _wiley_allowed(
     )
 
 
-def debug_save_pdf(
+def debug_save_file(
     paper_metadata: Dict[str, Any],
     filepath: Union[str, Path],
     api_keys: Optional[Union[str, Dict[str, str]]] = None,
@@ -1100,10 +1101,10 @@ def debug_save_pdf(
     successes = []
     per = {}
 
-    # Use a unique path for the initial direct check so save_pdf doesn't
+    # Use a unique path for the initial direct check so save_file doesn't
     # already save a fallback to the main output and interfere with later attempts.
     direct_check_path = Path(str(base_output) + ".direct_check")
-    direct_res = save_pdf(
+    direct_res = save_file(
         paper_metadata,
         direct_check_path,
         save_metadata=False,
@@ -1141,7 +1142,9 @@ def debug_save_pdf(
         try:
             if name == "unpaywall" and mail:
                 return FALLBACKS[name](doi, out, mail, None)
-            if name in ("europepmc", "doaj", "arxiv"):
+            if name == "europepmc":
+                return FALLBACKS[name](doi, out, preferred_type=preferred_type)
+            if name in ("doaj", "arxiv"):
                 return FALLBACKS[name](doi, out)
             if name == "openalex":
                 return FALLBACKS[name](doi, out, api_keys=api_keys, mail=mail)
@@ -1220,7 +1223,7 @@ def debug_save_pdf(
 
 
 # python
-def debug_save_pdf_from_dump(
+def debug_save_file_from_dump(
     dump_path: str,
     pdf_path: str,
     api_keys: Optional[str] = None,
@@ -1266,7 +1269,7 @@ def debug_save_pdf_from_dump(
             continue
         filename = paper["doi"].replace("/", "_")
         out = str(Path(os.path.join(pdf_path, f"{filename}.pdf")))
-        res = debug_save_pdf(
+        res = debug_save_file(
             paper,
             out,
             api_keys=api_keys,
@@ -1290,3 +1293,11 @@ def debug_save_pdf_from_dump(
     except Exception as e:
         logger.error(f"Failed to write final debug fallback stats: {e}")
     return {"by_doi": by_doi, "counts": counts}
+
+# Backward-compatible aliases
+save_pdf = save_file
+save_pdf_and_xml = save_file_and_xml
+save_pdf_from_dump = save_file_from_dump
+debug_save_pdf = debug_save_file
+debug_save_pdf_from_dump = debug_save_file_from_dump
+

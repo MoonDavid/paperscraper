@@ -180,9 +180,9 @@ multi-database querying, and plotting.
 Download a PDF or XML by DOI:
 
 ```py
-from paperscraper.pdf import save_pdf
+from paperscraper.pdf import save_file
 
-save_pdf({"doi": "10.48550/arXiv.2207.03928"}, filepath="gt4sd_paper.pdf")
+save_file({"doi": "10.48550/arXiv.2207.03928"}, filepath="gt4sd_paper.pdf")
 ```
 
 Output: `True` when the file was saved.
@@ -290,7 +290,7 @@ Thanks to the following contributors:
 - [@achouhan93](https://github.com/achouhan93): added date-bounded scraping for
   {med/bio/chem}rxiv.
 - [@daenuprobst](https://github.com/daenuprobst): added direct PDF scraping via
-  `paperscraper.pdf.save_pdf`.
+  `paperscraper.pdf.save_file`.
 - [@oppih](https://github.com/oppih): added chemRxiv DOI and URL metadata where available.
 - [@lukasschwab](https://github.com/lukasschwab): enabled support for `arxiv` > `1.4.2`.
 - [@juliusbierk](https://github.com/juliusbierk): bug fixes.
