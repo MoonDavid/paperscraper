@@ -41,6 +41,34 @@ save_pdf_from_dump(
 
 `key_to_save` can be `"doi"`, `"title"`, or `"date"`.
 
+### Web of Science tab-delimited exports
+
+`save_pdf_from_dump` also accepts Web of Science **Tab-delimited (Win, UTF-8)**
+exports (usually named `savedrecs.txt`):
+
+```py
+from paperscraper.pdf import save_pdf_from_dump
+
+save_pdf_from_dump(
+    "savedrecs.txt",
+    pdf_path="wos_pdfs",
+    key_to_save="doi",
+    mail="you@example.com",  # helps Unpaywall / NCBI polite use
+)
+```
+
+In Web of Science: Export → Tab delimited / Tab-delimited (Win, UTF-8). The
+loader maps WoS tags such as `DI`→`doi`, `TI`→`title`, `AF`→`authors`,
+`AB`→`abstract`, `PY`→`date`, `SO`→`journal`, and `PM`→`pubmed_id`.
+
+To convert a WoS export to a paperscraper `.jsonl` dump first:
+
+```py
+from paperscraper.utils import wos_tba_to_jsonl
+
+wos_tba_to_jsonl("savedrecs.txt", "savedrecs.jsonl")
+```
+
 ## Fallbacks
 
 When direct PDF retrieval fails, `paperscraper` tries supported fallbacks:
