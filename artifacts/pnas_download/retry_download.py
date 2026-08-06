@@ -253,13 +253,13 @@ def try_unpaywall_probe() -> Optional[str]:
         return None
 
 
-def try_paperscraper_save_pdf() -> bool:
-    from paperscraper.pdf import load_api_keys, save_pdf
+def try_paperscraper_save_file() -> bool:
+    from paperscraper.pdf import load_api_keys, save_file
 
     api_keys = load_api_keys(None)
-    out = PDF_DIR / "save_pdf.pdf"
+    out = PDF_DIR / "save_file.pdf"
     try:
-        res = save_pdf(
+        res = save_file(
             {"doi": DOI},
             filepath=out,
             save_metadata=True,
@@ -272,21 +272,21 @@ def try_paperscraper_save_pdf() -> bool:
             path = str(out.with_suffix(".pdf"))
         elif out.with_suffix(".xml").exists():
             path = str(out.with_suffix(".xml"))
-        record_attempt("save_pdf", ok, detail=res, path=path)
+        record_attempt("save_file", ok, detail=res, path=path)
         return ok
     except Exception as e:
-        record_attempt("save_pdf", False, error=f"{e}\n{traceback.format_exc()}")
+        record_attempt("save_file", False, error=f"{e}\n{traceback.format_exc()}")
         return False
 
 
-def try_debug_save_pdf() -> bool:
+def try_debug_save_file() -> bool:
     from paperscraper.pdf import load_api_keys
-    from paperscraper.pdf.pdf import debug_save_pdf
+    from paperscraper.pdf.pdf import debug_save_file
 
     api_keys = load_api_keys(None)
-    out = PDF_DIR / "debug_save_pdf.pdf"
+    out = PDF_DIR / "debug_save_file.pdf"
     try:
-        res = debug_save_pdf(
+        res = debug_save_file(
             {"doi": DOI},
             filepath=out,
             api_keys=api_keys,
@@ -294,11 +294,11 @@ def try_debug_save_pdf() -> bool:
             save_first_only=False,
         )
         ok = bool(res.get("successes"))
-        record_attempt("debug_save_pdf_all", ok, detail=res)
+        record_attempt("debug_save_file_all", ok, detail=res)
         return ok
     except Exception as e:
         record_attempt(
-            "debug_save_pdf_all", False, error=f"{e}\n{traceback.format_exc()}"
+            "debug_save_file_all", False, error=f"{e}\n{traceback.format_exc()}"
         )
         return False
 
@@ -613,9 +613,9 @@ def main() -> int:
     try_pmc_oa()
 
     # 4) paperscraper APIs
-    try_paperscraper_save_pdf()
+    try_paperscraper_save_file()
     try_each_fallback()
-    try_debug_save_pdf()
+    try_debug_save_file()
 
     return finalize()
 

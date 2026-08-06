@@ -189,10 +189,10 @@ def _get_abstract_europepmc(doi: str, timeout: int = 20) -> Optional[str]:
         return None
 
 
-# --- Replace abstract retrieval section in save_pdf with the following block ---
+# Full-text retrieval (PDF/XML/Markdown)
 
 
-def save_pdf(
+def save_file(
     paper_metadata: Dict[str, Any],
     filepath: Union[str, Path],
     save_metadata: bool = False,
@@ -202,11 +202,11 @@ def save_pdf(
     to_markdown: bool = False,
 ) -> Dict[str, Any]:
     """
-    Save a PDF file of a paper.
+    Save a full-text file for a paper (PDF and/or XML, optionally Markdown).
 
     Args:
         paper_metadata: A dictionary with the paper metadata. Must contain the `doi` key.
-        filepath: Path to the PDF file to be saved (with or without suffix).
+        filepath: Path to the file to be saved (with or without suffix).
         save_metadata: A boolean indicating whether to save paper metadata as a separate json.
         api_keys: Either a dictionary containing API keys (if already loaded) or a string (path to API keys file).
                   If None, will try to load from `.env` file and if unsuccessful, skip API-based fallbacks.
@@ -229,7 +229,7 @@ def save_pdf(
     if not output_path.parent.exists():
         raise ValueError(f"The folder: {output_path.parent} seems to not exist.")
 
-    # load API keys from file if not already loaded via in save_pdf_from_dump (dict)
+    # load API keys from file if not already loaded via save_file_from_dump (dict)
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
     doi = paper_metadata["doi"]
@@ -486,23 +486,24 @@ def save_pdf(
         return _finish({"success": False, "method": "abstract", "filetype": "txt"})
 
 
-def save_pdf_from_dump(
+def save_file_from_dump(
     dump_path: str,
-    pdf_path: str,
+    output_path: Optional[str] = None,
     key_to_save: str = "doi",
     save_metadata: bool = False,
     api_keys: Optional[str] = None,
     preferred_type: str = "pdf",
     mail: Optional[str] = None,
     to_markdown: bool = False,
+    pdf_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Receives a path to a `.jsonl` dump with paper metadata and saves the PDF files of
-    each paper.
+    Receives a path to a `.jsonl` dump with paper metadata and saves full-text
+    files for each paper (PDF and/or XML, optionally Markdown).
 
     Args:
         dump_path: Path to a `.jsonl` file with paper metadata, one paper per line.
-        pdf_path: Path to a folder where the files will be stored.
+        output_path: Path to a folder where the files will be stored.
         key_to_save: Key in the paper metadata to use as filename.
             Has to be `doi` or `title`. Defaults to `doi`.
         save_metadata: A boolean indicating whether to save paper metadata as a separate json.
@@ -512,17 +513,31 @@ def save_pdf_from_dump(
         to_markdown: If True, convert each successful PDF/XML download to Markdown
             (``.md`` beside the binary) via Firecrawl ``anydoc``. Requires
             ``pip install 'paperscraper[markdown]'`` (Python >= 3.10).
+        pdf_path: Deprecated alias for ``output_path``.
     Returns:
-        A dict containing per-DOI results and counts. Also writes fallback_stats.json to pdf_path.
+        A dict containing per-DOI results and counts. Also writes fallback_stats.json
+        to ``output_path``.
     """
+
+    if output_path is None and pdf_path is None:
+        raise TypeError(
+            "save_file_from_dump() missing required argument: 'output_path'"
+        )
+    if (
+        output_path is not None
+        and pdf_path is not None
+        and output_path != pdf_path
+    ):
+        raise TypeError("Specify only one of output_path or pdf_path")
+    output_path = output_path if output_path is not None else pdf_path
 
     if not isinstance(dump_path, str):
         raise TypeError(f"dump_path must be a string, not {type(dump_path)}.")
     if not dump_path.endswith(".jsonl"):
         raise ValueError("Please provide a dump_path with .jsonl extension.")
 
-    if not isinstance(pdf_path, str):
-        raise TypeError(f"pdf_path must be a string, not {type(pdf_path)}.")
+    if not isinstance(output_path, str):
+        raise TypeError(f"output_path must be a string, not {type(output_path)}.")
 
     if not isinstance(key_to_save, str):
         raise TypeError(f"key_to_save must be a string, not {type(key_to_save)}.")
@@ -540,7 +555,8 @@ def save_pdf_from_dump(
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
 
-    os.makedirs(pdf_path, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
+    target_dir = output_path
 
     results_by_doi: Dict[str, Dict[str, Any]] = {}
     counts_by_method: Dict[str, int] = {}
@@ -558,7 +574,7 @@ def save_pdf_from_dump(
             )
             continue
         filename = paper[key_to_save].replace("/", "_")
-        pdf_file = Path(os.path.join(pdf_path, f"{filename}.pdf"))
+        pdf_file = Path(os.path.join(target_dir, f"{filename}.pdf"))
         xml_file = pdf_file.with_suffix(".xml")
         md_file = pdf_file.with_suffix(".md")
         if pdf_file.exists() or xml_file.exists():
@@ -593,10 +609,10 @@ def save_pdf_from_dump(
             }
             counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
             continue
-        output_path = str(pdf_file)
-        result = save_pdf(
+        paper_out = str(pdf_file)
+        result = save_file(
             paper,
-            output_path,
+            paper_out,
             save_metadata=save_metadata,
             api_keys=api_keys,
             preferred_type=preferred_type,
@@ -630,7 +646,7 @@ def save_pdf_from_dump(
             "counts": counts_by_method,
             "by_doi": results_by_doi,
         }
-        stats_path = Path(pdf_path) / "fallback_stats.json"
+        stats_path = Path(target_dir) / "fallback_stats.json"
         with open(stats_path, "w", encoding="utf-8") as f:
             json.dump(stats, f, ensure_ascii=False, indent=2)
         logger.info(f"Saved fallback stats to {stats_path}")
@@ -705,7 +721,7 @@ def _wiley_allowed(
     return False
 
 
-def debug_save_pdf(
+def debug_save_file(
     paper_metadata: Dict[str, Any],
     filepath: Union[str, Path],
     api_keys: Optional[Union[str, Dict[str, str]]] = None,
@@ -727,10 +743,10 @@ def debug_save_pdf(
     successes = []
     per = {}
 
-    # Use a unique path for the initial direct check so save_pdf doesn't
+    # Use a unique path for the initial direct check so save_file doesn't
     # already save a fallback to the main output and interfere with later attempts.
     direct_check_path = Path(str(base_output) + ".direct_check")
-    direct_res = save_pdf(
+    direct_res = save_file(
         paper_metadata,
         direct_check_path,
         save_metadata=False,
@@ -828,20 +844,35 @@ def debug_save_pdf(
 
 
 # python
-def debug_save_pdf_from_dump(
+def debug_save_file_from_dump(
     dump_path: str,
-    pdf_path: str,
+    output_path: Optional[str] = None,
     api_keys: Optional[str] = None,
     preferred_type: str = "pdf",
     mail: Optional[str] = None,
     save_first_only: bool = True,
     save_interval: int = 10,
+    pdf_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Debug variant for batch processing that tests all fallbacks per paper and records which work.
     Writes a debug_fallback_stats.json with detailed per-DOI outcomes.
     Saves intermediate stats every `save_interval` papers so partial results are available.
+
+    ``pdf_path`` is a deprecated alias for ``output_path``.
     """
+    if output_path is None and pdf_path is None:
+        raise TypeError(
+            "debug_save_file_from_dump() missing required argument: 'output_path'"
+        )
+    if (
+        output_path is not None
+        and pdf_path is not None
+        and output_path != pdf_path
+    ):
+        raise TypeError("Specify only one of output_path or pdf_path")
+    output_path = output_path if output_path is not None else pdf_path
+
     papers = load_jsonl(dump_path)
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
@@ -873,8 +904,8 @@ def debug_save_pdf_from_dump(
         if "doi" not in paper or not paper["doi"]:
             continue
         filename = paper["doi"].replace("/", "_")
-        out = str(Path(os.path.join(pdf_path, f"{filename}.pdf")))
-        res = debug_save_pdf(
+        out = str(Path(os.path.join(output_path, f"{filename}.pdf")))
+        res = debug_save_file(
             paper,
             out,
             api_keys=api_keys,
@@ -890,11 +921,18 @@ def debug_save_pdf_from_dump(
 
         # periodically save partial stats so you can inspect mid-run
         if save_interval > 0 and ((i + 1) % save_interval == 0):
-            _write_debug_stats(pdf_path, by_doi, counts)
+            _write_debug_stats(output_path, by_doi, counts)
 
     # write final debug stats
     try:
-        _write_debug_stats(pdf_path, by_doi, counts)
+        _write_debug_stats(output_path, by_doi, counts)
     except Exception as e:
         logger.error(f"Failed to write final debug fallback stats: {e}")
     return {"by_doi": by_doi, "counts": counts}
+
+
+# Backward-compatible aliases
+save_pdf = save_file
+save_pdf_from_dump = save_file_from_dump
+debug_save_pdf = debug_save_file
+debug_save_pdf_from_dump = debug_save_file_from_dump

@@ -9,9 +9,9 @@ publisher pages, and institutional/API access.
 Download a single paper by DOI:
 
 ```pycon
->>> from paperscraper.pdf import save_pdf
+>>> from paperscraper.pdf import save_file
 >>> paper = {"doi": "10.48550/arXiv.2207.03928"}
->>> save_pdf(paper, filepath="gt4sd_paper.pdf")
+>>> save_file(paper, filepath="gt4sd_paper.pdf")
 True
 ```
 
@@ -21,7 +21,7 @@ file next to the requested path when XML full text is the available format.
 Pass `save_metadata=True` to store paper metadata next to the downloaded file:
 
 ```pycon
->>> save_pdf(paper, filepath="gt4sd_paper.pdf", save_metadata=True)
+>>> save_file(paper, filepath="gt4sd_paper.pdf", save_metadata=True)
 True
 ```
 
@@ -30,11 +30,11 @@ True
 Download PDFs or XMLs from a metadata dump:
 
 ```py
-from paperscraper.pdf import save_pdf_from_dump
+from paperscraper.pdf import save_file_from_dump
 
-save_pdf_from_dump(
+save_file_from_dump(
     "ai_quantum_chemistry.jsonl",
-    pdf_path="papers",
+    output_path="papers",
     key_to_save="doi",
 )
 ```
@@ -56,17 +56,17 @@ This pulls in [Firecrawl anydoc](https://pypi.org/project/firecrawl-anydoc/)
 Pass `to_markdown=True` to write a `.md` file beside each successful PDF/XML:
 
 ```py
-from paperscraper.pdf import save_pdf, save_pdf_from_dump
+from paperscraper.pdf import save_file, save_file_from_dump
 
-save_pdf(
+save_file(
     {"doi": "10.1073/pnas.1718406115"},
     filepath="pnas_paper.pdf",
     to_markdown=True,
 )
 
-save_pdf_from_dump(
+save_file_from_dump(
     "ai_quantum_chemistry.jsonl",
-    pdf_path="papers",
+    output_path="papers",
     key_to_save="doi",
     to_markdown=True,
 )
@@ -109,9 +109,9 @@ AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
 Then pass the path when downloading from a dump:
 
 ```py
-save_pdf_from_dump(
+save_file_from_dump(
     "pubmed_query_results.jsonl",
-    pdf_path="papers",
+    output_path="papers",
     key_to_save="doi",
     api_keys="api_keys.txt",
 )
@@ -120,10 +120,10 @@ save_pdf_from_dump(
 Or load the keys once and reuse them across calls:
 
 ```py
-from paperscraper.pdf import load_api_keys, save_pdf
+from paperscraper.pdf import load_api_keys, save_file
 
 api_keys = load_api_keys("api_keys.txt")
-save_pdf(
+save_file(
     {"doi": "10.1101/786871"},
     filepath="taskload.pdf",
     api_keys=api_keys,
