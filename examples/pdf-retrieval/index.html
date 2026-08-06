@@ -1131,6 +1131,24 @@ loader maps WoS tags such as <code>DI</code>→<code>doi</code>, <code>TI</code>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">wos_tba_to_jsonl</span><span class="p">(</span><span class="s2">&quot;savedrecs.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;savedrecs.jsonl&quot;</span><span class="p">)</span>
 </code></pre></div>
+<p>To download <strong>both PDF and XML</strong> when available:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">save_pdf_from_dump</span><span class="p">(</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">&quot;ai_quantum_chemistry.jsonl&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">pdf_path</span><span class="o">=</span><span class="s2">&quot;papers&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">key_to_save</span><span class="o">=</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">preferred_type</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">mail</span><span class="o">=</span><span class="s2">&quot;you@institution.edu&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span>
+</code></pre></div>
+<p>Or for a single paper:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">save_pdf_and_xml</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">save_pdf_and_xml</span><span class="p">(</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="p">{</span><span class="s2">&quot;doi&quot;</span><span class="p">:</span> <span class="s2">&quot;10.1038/s41598-023-32245-9&quot;</span><span class="p">},</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;paper&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">mail</span><span class="o">=</span><span class="s2">&quot;you@institution.edu&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">)</span>
+</code></pre></div>
 <h2 id="fallbacks">Fallbacks<a class="headerlink" href="#fallbacks" title="Permanent link">&para;</a></h2>
 <p>When direct PDF retrieval fails, <code>paperscraper</code> tries supported fallbacks:</p>
 <ul>
@@ -1143,28 +1161,30 @@ loader maps WoS tags such as <code>DI</code>→<code>doi</code>, <code>TI</code>
 or paywalls.</p>
 <h2 id="publisher-api-keys">Publisher API Keys<a class="headerlink" href="#publisher-api-keys" title="Permanent link">&para;</a></h2>
 <p>Publisher API keys can be supplied via a file or loaded from <code>.env</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>WILEY_TDM_API_TOKEN=your_wiley_token_here
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>ELSEVIER_TDM_API_KEY=your_elsevier_key_here
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>AWS_ACCESS_KEY_ID=your_aws_access_key_here
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>WILEY_TDM_API_TOKEN=your_wiley_token_here
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>ELSEVIER_TDM_API_KEY=your_elsevier_key_here
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>SPRINGER_OPEN_ACCESS_API=your_springer_open_access_key_here
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>SPRINGER_API_KEY=your_springer_metadata_key_here
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>AWS_ACCESS_KEY_ID=your_aws_access_key_here
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
 </code></pre></div>
 <p>Then pass the path when downloading from a dump:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">save_pdf_from_dump</span><span class="p">(</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="s2">&quot;pubmed_query_results.jsonl&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">pdf_path</span><span class="o">=</span><span class="s2">&quot;papers&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">key_to_save</span><span class="o">=</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">api_keys</span><span class="o">=</span><span class="s2">&quot;api_keys.txt&quot;</span><span class="p">,</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">save_pdf_from_dump</span><span class="p">(</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="s2">&quot;pubmed_query_results.jsonl&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">pdf_path</span><span class="o">=</span><span class="s2">&quot;papers&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">key_to_save</span><span class="o">=</span><span class="s2">&quot;doi&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">api_keys</span><span class="o">=</span><span class="s2">&quot;api_keys.txt&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">)</span>
 </code></pre></div>
 <p>Or load the keys once and reuse them across calls:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_api_keys</span><span class="p">,</span> <span class="n">save_pdf</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="s2">&quot;api_keys.txt&quot;</span><span class="p">)</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">save_pdf</span><span class="p">(</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="p">{</span><span class="s2">&quot;doi&quot;</span><span class="p">:</span> <span class="s2">&quot;10.1101/786871&quot;</span><span class="p">},</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;taskload.pdf&quot;</span><span class="p">,</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">paperscraper.pdf</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_api_keys</span><span class="p">,</span> <span class="n">save_pdf</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">api_keys</span> <span class="o">=</span> <span class="n">load_api_keys</span><span class="p">(</span><span class="s2">&quot;api_keys.txt&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">save_pdf</span><span class="p">(</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>    <span class="p">{</span><span class="s2">&quot;doi&quot;</span><span class="p">:</span> <span class="s2">&quot;10.1101/786871&quot;</span><span class="p">},</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="n">filepath</span><span class="o">=</span><span class="s2">&quot;taskload.pdf&quot;</span><span class="p">,</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    <span class="n">api_keys</span><span class="o">=</span><span class="n">api_keys</span><span class="p">,</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="p">)</span>
 </code></pre></div>
 <p>Wiley and Elsevier TDM APIs are generally free for eligible academic users with
 institutional access. For bioRxiv S3 access, use an AWS IAM key with
