@@ -186,11 +186,15 @@ class TestPDF:
 
     def test_save_file_from_dump_wrong_key(self):
         with pytest.raises(ValueError):
-            save_file_from_dump(TEST_FILE_PATH, output_path=SAVE_PATH, key_to_save="doix")
+            save_file_from_dump(
+                TEST_FILE_PATH, output_path=SAVE_PATH, key_to_save="doix"
+            )
 
     def test_save_file_from_dump_wrong_key_type(self):
         with pytest.raises(TypeError):
-            save_file_from_dump(TEST_FILE_PATH, output_path=SAVE_PATH, key_to_save=["doix"])
+            save_file_from_dump(
+                TEST_FILE_PATH, output_path=SAVE_PATH, key_to_save=["doix"]
+            )
 
     def test_save_file_from_dump(self):
         os.makedirs(SAVE_PATH, exist_ok=True)
@@ -434,9 +438,7 @@ class TestPDF:
         """Europe PMC should recover via PDF render when fullTextXML 404s."""
         search = MagicMock()
         search.raise_for_status = MagicMock()
-        search.json.return_value = {
-            "resultList": {"result": [{"pmcid": "PMC5924899"}]}
-        }
+        search.json.return_value = {"resultList": {"result": [{"pmcid": "PMC5924899"}]}}
         xml_404 = MagicMock()
         xml_404.raise_for_status.side_effect = Exception("404 Not Found")
         pdf_ok = MagicMock()
@@ -446,7 +448,9 @@ class TestPDF:
 
         output_path = Path("test_europepmc_pdf_output")
         try:
-            assert FALLBACKS["europepmc"]("10.1073/pnas.1718406115", output_path) is True
+            assert (
+                FALLBACKS["europepmc"]("10.1073/pnas.1718406115", output_path) is True
+            )
             pdf_path = output_path.with_suffix(".pdf")
             assert pdf_path.exists()
             assert pdf_path.read_bytes().startswith(b"%PDF")
@@ -553,4 +557,3 @@ class TestPDF:
         )
         stats = save_pdf_from_dump(str(dump), pdf_path=str(tmp_path / "out"))
         assert isinstance(stats, dict)
-

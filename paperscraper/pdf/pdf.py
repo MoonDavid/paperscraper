@@ -359,9 +359,7 @@ def save_file(
         return _finish({"success": True, "method": "unpaywall", "filetype": "pdf"})
 
     if FALLBACKS["europepmc"](doi, output_path):
-        filetype = (
-            "pdf" if Path(output_path).with_suffix(".pdf").exists() else "xml"
-        )
+        filetype = "pdf" if Path(output_path).with_suffix(".pdf").exists() else "xml"
         return _finish({"success": True, "method": "europepmc", "filetype": filetype})
 
     if FALLBACKS["bioc_pmc"](doi, output_path, mail or "your_email@example.com"):
@@ -379,15 +377,11 @@ def save_file(
 
     if has_aws and is_medrxiv and "medrxiv_s3" in FALLBACKS:
         if FALLBACKS["medrxiv_s3"](doi, output_path, api_keys):
-            return _finish(
-                {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
-            )
+            return _finish({"success": True, "method": "medrxiv_s3", "filetype": "pdf"})
 
     if has_aws and (is_biorxiv or (is_1101 and not is_medrxiv)):
         if FALLBACKS["s3"](doi, output_path, api_keys):
-            return _finish(
-                {"success": True, "method": "biorxiv_s3", "filetype": "pdf"}
-            )
+            return _finish({"success": True, "method": "biorxiv_s3", "filetype": "pdf"})
         # Ambiguous 10.1101 (no explicit bioRxiv signal): also try medRxiv S3.
         if (
             is_1101
@@ -395,9 +389,7 @@ def save_file(
             and "medrxiv_s3" in FALLBACKS
             and FALLBACKS["medrxiv_s3"](doi, output_path, api_keys)
         ):
-            return _finish(
-                {"success": True, "method": "medrxiv_s3", "filetype": "pdf"}
-            )
+            return _finish({"success": True, "method": "medrxiv_s3", "filetype": "pdf"})
 
     if "plos" in doi_l:
         if FALLBACKS["plos"](doi, output_path):
@@ -431,9 +423,7 @@ def save_file(
                 )
         if api_keys.get("WILEY_TDM_API_TOKEN"):
             if FALLBACKS["wiley"](paper_metadata, output_path, api_keys):
-                return _finish(
-                    {"success": True, "method": "wiley", "filetype": "pdf"}
-                )
+                return _finish({"success": True, "method": "wiley", "filetype": "pdf"})
         if api_keys.get("ELSEVIER_TDM_API_KEY"):
             if FALLBACKS["elsevier"](
                 paper_metadata, output_path, api_keys, preferred_type=preferred_type
@@ -523,11 +513,7 @@ def save_file_from_dump(
         raise TypeError(
             "save_file_from_dump() missing required argument: 'output_path'"
         )
-    if (
-        output_path is not None
-        and pdf_path is not None
-        and output_path != pdf_path
-    ):
+    if output_path is not None and pdf_path is not None and output_path != pdf_path:
         raise TypeError("Specify only one of output_path or pdf_path")
     output_path = output_path if output_path is not None else pdf_path
 
@@ -865,11 +851,7 @@ def debug_save_file_from_dump(
         raise TypeError(
             "debug_save_file_from_dump() missing required argument: 'output_path'"
         )
-    if (
-        output_path is not None
-        and pdf_path is not None
-        and output_path != pdf_path
-    ):
+    if output_path is not None and pdf_path is not None and output_path != pdf_path:
         raise TypeError("Specify only one of output_path or pdf_path")
     output_path = output_path if output_path is not None else pdf_path
 
