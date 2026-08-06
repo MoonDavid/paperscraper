@@ -69,6 +69,30 @@ from paperscraper.utils import wos_tba_to_jsonl
 wos_tba_to_jsonl("savedrecs.txt", "savedrecs.jsonl")
 ```
 
+To download **both PDF and XML** when available:
+
+```py
+save_pdf_from_dump(
+    "ai_quantum_chemistry.jsonl",
+    pdf_path="papers",
+    key_to_save="doi",
+    preferred_type="both",
+    mail="you@institution.edu",
+)
+```
+
+Or for a single paper:
+
+```py
+from paperscraper.pdf import save_pdf_and_xml
+
+save_pdf_and_xml(
+    {"doi": "10.1038/s41598-023-32245-9"},
+    filepath="paper",
+    mail="you@institution.edu",
+)
+```
+
 ## Fallbacks
 
 When direct PDF retrieval fails, `paperscraper` tries supported fallbacks:
@@ -88,6 +112,8 @@ Publisher API keys can be supplied via a file or loaded from `.env`:
 ```txt
 WILEY_TDM_API_TOKEN=your_wiley_token_here
 ELSEVIER_TDM_API_KEY=your_elsevier_key_here
+SPRINGER_OPEN_ACCESS_API=your_springer_open_access_key_here
+SPRINGER_API_KEY=your_springer_metadata_key_here
 AWS_ACCESS_KEY_ID=your_aws_access_key_here
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
 ```

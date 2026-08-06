@@ -4,8 +4,11 @@ import json
 import logging
 import os
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
+from urllib.parse import quote
 
 import requests
 import tldextract
@@ -14,7 +17,7 @@ from tqdm import tqdm
 
 from ..utils import load_papers_dump
 from .fallbacks import FALLBACKS
-from .utils import download_pdf_to_path, load_api_keys
+from .utils import download_pdf_to_path, get_session, load_api_keys
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,7 +45,7 @@ def _get_chemrxiv_item(
     """
     api_url = f"{CHEMRXIV_API_BASE}{doi}"
     try:
-        response = requests.get(api_url, timeout=60, headers=user_agent)
+        response = get_session().get(api_url, headers=user_agent)
         response.raise_for_status()
         data = response.json()
     except Exception as exc:
@@ -123,7 +126,7 @@ def _get_abstract_pubmed(pmid: str, timeout: int = 20) -> Optional[str]:
     try:
         url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
         params = {"db": "pubmed", "id": pmid, "retmode": "xml"}
-        resp = requests.get(url, params=params, timeout=timeout)
+        resp = get_session().get(url, params=params, timeout=timeout)
         resp.raise_for_status()
         soup_xml = BeautifulSoup(resp.text, "xml")
         abstract_texts = soup_xml.find_all("abstracttext")
@@ -138,13 +141,21 @@ def _get_abstract_pubmed(pmid: str, timeout: int = 20) -> Optional[str]:
         return None
 
 
-def _get_abstract_crossref(doi: str, timeout: int = 20) -> Optional[str]:
+def _get_abstract_crossref(
+    doi: str, timeout: int = 20, mail: Optional[str] = None
+) -> Optional[str]:
     """
     Query Crossref works API and return the abstract (HTML cleaned) or None.
+    Uses a polite mailto User-Agent when mail is provided.
     """
     try:
-        url = f"https://api.crossref.org/works/{doi}"
-        resp = requests.get(url, timeout=timeout)
+        url = f"https://api.crossref.org/works/{quote(doi, safe='')}"
+        contact = mail or "paperscraper@example.com"
+        headers = {
+            "User-Agent": f"paperscraper/1.0 (mailto:{contact})",
+            "Accept": "application/json",
+        }
+        resp = get_session().get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
         data = resp.json().get("message", {})
         raw = data.get("abstract")
@@ -165,7 +176,7 @@ def _get_abstract_europepmc(doi: str, timeout: int = 20) -> Optional[str]:
     try:
         url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
         params = {"query": f"DOI:{doi}", "resultType": "core", "format": "json"}
-        resp = requests.get(url, params=params, timeout=timeout)
+        resp = get_session().get(url, params=params, timeout=timeout)
         resp.raise_for_status()
         data = resp.json()
         results = data.get("resultList", {}).get("result", [])
@@ -208,10 +219,22 @@ def save_pdf(
         save_metadata: A boolean indicating whether to save paper metadata as a separate json.
         api_keys: Either a dictionary containing API keys (if already loaded) or a string (path to API keys file).
                   If None, will try to load from `.env` file and if unsuccessful, skip API-based fallbacks.
-        preferred_type: Preferred file type to download, 'pdf' or 'xml'. Defaults to 'pdf'.
+        preferred_type: Preferred file type to download, 'pdf', 'xml', or 'both'.
+            Defaults to 'pdf'. Use 'both' to download PDF and XML when available.
     Returns:
         A dict summary: {success: bool, method: str|None, filetype: 'pdf'|'xml'|None}
     """
+    if preferred_type == "both":
+        return save_pdf_and_xml(
+            paper_metadata=paper_metadata,
+            filepath=filepath,
+            save_metadata=save_metadata,
+            api_keys=api_keys,
+            mail=mail,
+        )
+    if preferred_type not in ("pdf", "xml"):
+        raise ValueError("preferred_type must be one of 'pdf', 'xml', or 'both'.")
+
     if not isinstance(paper_metadata, Dict):
         raise TypeError(f"paper_metadata must be a dict, not {type(paper_metadata)}.")
     if "doi" not in paper_metadata.keys():
@@ -261,8 +284,25 @@ def save_pdf(
             else:
                 logger.warning(f"ChemRxiv API response missing PDF URL for {doi}")
 
+    # Fast path: OpenAlex-batched OA PDF URL (from prefetch_openalex_metadata).
+    if preferred_type == "pdf":
+        oa_meta = _OPENALEX_META_CACHE.get(_normalize_doi(doi)) or _OPENALEX_META_CACHE.get(
+            _normalize_doi(doi).lower()
+        )
+        pdf_url = (oa_meta or {}).get("pdf_url")
+        if pdf_url:
+            try:
+                if download_pdf_to_path(pdf_url, output_path, user_agent):
+                    return {
+                        "success": True,
+                        "method": "openalex_cache",
+                        "filetype": "pdf",
+                    }
+            except Exception as exc:
+                logger.info(f"OpenAlex cached PDF URL failed for {doi}: {exc}")
+
     try:
-        response = requests.get(url, timeout=60)
+        response = get_session().get(url)
         soup = BeautifulSoup(response.text, features="lxml")
         response.raise_for_status()
         final_url = response.url
@@ -270,7 +310,7 @@ def save_pdf(
         meta_pdf = soup.find("meta", {"name": "citation_pdf_url"})
         if meta_pdf and meta_pdf.get("content"):
             pdf_url = meta_pdf.get("content")
-            pdf_response = requests.get(pdf_url, timeout=60)
+            pdf_response = get_session().get(pdf_url)
             pdf_response.raise_for_status()
 
             if pdf_response.content[:4] == b"%PDF":
@@ -380,7 +420,9 @@ def save_pdf(
             return {"success": True, "method": "elife", "filetype": "xml"}
 
     # Non-publisher OA aggregators
-    if "openalex" in FALLBACKS and FALLBACKS["openalex"](doi, output_path):
+    if "openalex" in FALLBACKS and FALLBACKS["openalex"](
+        doi, output_path, api_keys=api_keys, mail=mail
+    ):
         return {"success": True, "method": "openalex", "filetype": "pdf"}
 
     if "crossref" in FALLBACKS and FALLBACKS["crossref"](
@@ -394,15 +436,28 @@ def save_pdf(
     if "arxiv" in FALLBACKS and FALLBACKS["arxiv"](doi, output_path):
         return {"success": True, "method": "arxiv", "filetype": "pdf"}
 
-    # Publisher TDM APIs
+    # Publisher TDM / Open Access APIs — only when Crossref/domain says that publisher owns the DOI
     if api_keys:
-        if api_keys.get("SPRINGER_API_KEY") and FALLBACKS.get("springer"):
+        has_springer_key = bool(
+            api_keys.get("SPRINGER_OPEN_ACCESS_API") or api_keys.get("SPRINGER_API_KEY")
+        )
+        if (
+            has_springer_key
+            and FALLBACKS.get("springer")
+            and _publisher_api_allowed(
+                doi, "springer", mail=mail, final_url=final_url, api_keys=api_keys
+            )
+        ):
             if FALLBACKS["springer"](paper_metadata, output_path, api_keys):
                 return {"success": True, "method": "springer", "filetype": "pdf"}
-        if api_keys.get("WILEY_TDM_API_TOKEN"):
+        if api_keys.get("WILEY_TDM_API_TOKEN") and _publisher_api_allowed(
+            doi, "wiley", mail=mail, final_url=final_url, api_keys=api_keys
+        ):
             if FALLBACKS["wiley"](paper_metadata, output_path, api_keys):
                 return {"success": True, "method": "wiley", "filetype": "pdf"}
-        if api_keys.get("ELSEVIER_TDM_API_KEY"):
+        if api_keys.get("ELSEVIER_TDM_API_KEY") and _publisher_api_allowed(
+            doi, "elsevier", mail=mail, final_url=final_url, api_keys=api_keys
+        ):
             if FALLBACKS["elsevier"](
                 paper_metadata, output_path, api_keys, preferred_type=preferred_type
             ):
@@ -434,7 +489,7 @@ def save_pdf(
     # 3) If still no abstract, try Crossref for the DOI
     if not abstract_text:
         try:
-            abstract_text = _get_abstract_crossref(doi)
+            abstract_text = _get_abstract_crossref(doi, mail=mail)
         except Exception:
             abstract_text = None
 
@@ -452,6 +507,136 @@ def save_pdf(
         return {"success": False, "method": "abstract", "filetype": "txt"}
 
 
+def _try_download_xml(
+    paper_metadata: Dict[str, Any],
+    output_path: Union[str, Path],
+    api_keys: Optional[Dict[str, str]] = None,
+    mail: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Try XML-only sources for a paper. Skips work if `.xml` already exists."""
+    output_path = Path(output_path)
+    xml_path = output_path.with_suffix(".xml")
+    if xml_path.exists():
+        return {"success": True, "method": "existing", "filetype": "xml"}
+
+    if not isinstance(api_keys, dict):
+        api_keys = load_api_keys(api_keys)
+
+    doi = paper_metadata["doi"]
+    contact = mail or "your_email@example.com"
+
+    if FALLBACKS["europepmc"](doi, output_path):
+        return {"success": True, "method": "europepmc", "filetype": "xml"}
+    if FALLBACKS["bioc_pmc"](doi, output_path, contact):
+        return {"success": True, "method": "bioc_pmc", "filetype": "xml"}
+    if "elife" in doi.lower() and FALLBACKS["elife"](doi, output_path):
+        return {"success": True, "method": "elife", "filetype": "xml"}
+    if api_keys.get("ELSEVIER_TDM_API_KEY") and _publisher_api_allowed(
+        doi, "elsevier", mail=mail, api_keys=api_keys
+    ):
+        if FALLBACKS["elsevier"](
+            paper_metadata, output_path, api_keys, preferred_type="xml"
+        ):
+            return {"success": True, "method": "elsevier", "filetype": "xml"}
+
+    return {"success": False, "method": None, "filetype": None}
+
+
+def save_pdf_and_xml(
+    paper_metadata: Dict[str, Any],
+    filepath: Union[str, Path],
+    save_metadata: bool = False,
+    api_keys: Optional[Union[str, Dict[str, str]]] = None,
+    mail: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Download both PDF and XML when available.
+
+    Runs PDF retrieval first, then XML-only sources for any missing XML. If PDF is
+    still missing after a successful XML hit (e.g. BioC-PMC), retries Elsevier PDF.
+    """
+    if not isinstance(api_keys, dict):
+        api_keys = load_api_keys(api_keys)
+
+    output_path = Path(filepath)
+    pdf_path = output_path.with_suffix(".pdf")
+    xml_path = output_path.with_suffix(".xml")
+
+    pdf_result: Dict[str, Any] = {
+        "success": False,
+        "method": None,
+        "filetype": None,
+    }
+    xml_result: Dict[str, Any] = {
+        "success": False,
+        "method": None,
+        "filetype": None,
+    }
+
+    if pdf_path.exists():
+        pdf_result = {"success": True, "method": "existing", "filetype": "pdf"}
+    else:
+        # Prefer PDF sources; may still land an XML via PMC fallbacks.
+        pdf_result = save_pdf(
+            paper_metadata,
+            filepath=output_path,
+            save_metadata=save_metadata,
+            api_keys=api_keys,
+            preferred_type="pdf",
+            mail=mail,
+        )
+        # If an XML-only source succeeded, treat that as the XML result.
+        if pdf_result.get("filetype") == "xml" and xml_path.exists():
+            xml_result = {
+                "success": True,
+                "method": pdf_result.get("method"),
+                "filetype": "xml",
+            }
+            pdf_result = {"success": False, "method": None, "filetype": None}
+
+    if xml_path.exists() and not xml_result.get("success"):
+        xml_result = {"success": True, "method": "existing", "filetype": "xml"}
+    elif not xml_path.exists():
+        xml_result = _try_download_xml(
+            paper_metadata, output_path, api_keys=api_keys, mail=mail
+        )
+
+    # If we only got XML so far, try Elsevier PDF explicitly (Elsevier DOIs only).
+    if (
+        not pdf_path.exists()
+        and api_keys.get("ELSEVIER_TDM_API_KEY")
+        and _publisher_api_allowed(
+            paper_metadata["doi"], "elsevier", mail=mail, api_keys=api_keys
+        )
+    ):
+        if FALLBACKS["elsevier"](
+            paper_metadata, output_path, api_keys, preferred_type="pdf"
+        ):
+            pdf_result = {"success": True, "method": "elsevier", "filetype": "pdf"}
+
+    has_pdf = pdf_path.exists()
+    has_xml = xml_path.exists()
+    parts = []
+    methods = []
+    if has_pdf:
+        parts.append("pdf")
+        methods.append(f"pdf:{pdf_result.get('method') or 'unknown'}")
+    if has_xml:
+        parts.append("xml")
+        methods.append(f"xml:{xml_result.get('method') or 'unknown'}")
+
+    filetype = "+".join(parts) if parts else (
+        "txt" if pdf_result.get("filetype") == "txt" else None
+    )
+    return {
+        "success": has_pdf or has_xml,
+        "method": ";".join(methods) if methods else pdf_result.get("method"),
+        "filetype": filetype,
+        "pdf": pdf_result if has_pdf else {"success": False, "method": None, "filetype": None},
+        "xml": xml_result if has_xml else {"success": False, "method": None, "filetype": None},
+    }
+
+
 def save_pdf_from_dump(
     dump_path: str,
     pdf_path: str,
@@ -460,6 +645,7 @@ def save_pdf_from_dump(
     api_keys: Optional[str] = None,
     preferred_type: str = "pdf",
     mail: Optional[str] = None,
+    max_workers: int = 16,
 ) -> Dict[str, Any]:
     """
     Receives a path to a paper metadata dump and saves the PDF/XML files of
@@ -476,8 +662,10 @@ def save_pdf_from_dump(
             Has to be `doi`, `title`, or `date`. Defaults to `doi`.
         save_metadata: A boolean indicating whether to save paper metadata as a separate json.
         api_keys: Path to a file with API keys. If None, API-based fallbacks will be skipped.
-        preferred_type: Preferred file type to download, 'pdf' or 'xml'. Defaults to 'pdf'.
+        preferred_type: Preferred file type to download, 'pdf', 'xml', or 'both'.
+            Defaults to 'pdf'. Use 'both' to save PDF and XML when both are available.
         mail: Optional email address to use for Unpaywall API requests.
+        max_workers: Concurrent paper downloads (rate-limited per API). Defaults to 16.
     Returns:
         A dict containing per-DOI results and counts. Also writes fallback_stats.json to pdf_path.
     """
@@ -505,31 +693,53 @@ def save_pdf_from_dump(
         raise ValueError(
             f"key_to_save must be one of 'doi', 'title', or 'date', not {key_to_save!r}."
         )
-    if preferred_type not in ["pdf", "xml"]:
-        raise ValueError("preferred_type must be one of 'pdf' or 'xml'.")
+    if preferred_type not in ["pdf", "xml", "both"]:
+        raise ValueError("preferred_type must be one of 'pdf', 'xml', or 'both'.")
+    if not isinstance(max_workers, int) or max_workers < 1:
+        raise ValueError(f"max_workers must be a positive int, got {max_workers!r}.")
 
     papers = load_papers_dump(dump_path)
 
     if not isinstance(api_keys, dict):
         api_keys = load_api_keys(api_keys)
 
+    # One OpenAlex batch up front for publisher/OA gating (no Crossref).
+    dois = [p.get("doi") for p in papers if p.get("doi")]
+    if dois:
+        prefetch_openalex_metadata(dois, api_keys=api_keys, mail=mail)
+
     os.makedirs(pdf_path, exist_ok=True)
 
     results_by_doi: Dict[str, Dict[str, Any]] = {}
     counts_by_method: Dict[str, int] = {}
+    lock = threading.Lock()
 
-    pbar = tqdm(papers, total=len(papers), desc="Processing")
-    for i, paper in enumerate(pbar):
-        pbar.set_description(f"Processing paper {i + 1}/{len(papers)}")
+    def _record(doi: str, result: Dict[str, Any]) -> None:
+        with lock:
+            results_by_doi[doi] = result
+            if result and result.get("method"):
+                if result.get("success"):
+                    counts_by_method[result["method"]] = (
+                        counts_by_method.get(result["method"], 0) + 1
+                    )
+                elif result.get("method") == "abstract":
+                    counts_by_method["abstract_only"] = (
+                        counts_by_method.get("abstract_only", 0) + 1
+                    )
+                else:
+                    counts_by_method["failed"] = counts_by_method.get("failed", 0) + 1
+            else:
+                counts_by_method["failed"] = counts_by_method.get("failed", 0) + 1
 
+    def _process_one(paper: Dict[str, Any]) -> None:
         if "doi" not in paper.keys() or paper["doi"] is None:
             logger.warning("Skipping paper since no DOI available.")
-            continue
+            return
         if key_to_save not in paper.keys() or paper[key_to_save] is None:
             logger.warning(
                 f"Skipping paper {paper.get('doi')} since key {key_to_save!r} is missing."
             )
-            continue
+            return
         filename = str(paper[key_to_save]).replace("/", "_")
         # Soft-sanitize Windows/POSIX-hostile characters from titles etc.
         for bad in (":", "*", "?", '"', "<", ">", "|", "\\"):
@@ -539,48 +749,69 @@ def save_pdf_from_dump(
             filename = filename[:180].rstrip(" ._")
         pdf_file = Path(os.path.join(pdf_path, f"{filename}.pdf"))
         xml_file = pdf_file.with_suffix(".xml")
-        if pdf_file.exists():
-            logger.info(f"File {pdf_file} already exists. Skipping download.")
-            results_by_doi[paper["doi"]] = {
-                "success": True,
-                "method": "existing",
-                "filetype": "pdf",
-            }
-            counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
-            continue
-        if xml_file.exists():
-            logger.info(f"File {xml_file} already exists. Skipping download.")
-            results_by_doi[paper["doi"]] = {
-                "success": True,
-                "method": "existing",
-                "filetype": "xml",
-            }
-            counts_by_method["existing"] = counts_by_method.get("existing", 0) + 1
-            continue
-        output_path = str(pdf_file)
+        want_pdf = preferred_type in ("pdf", "both")
+        want_xml = preferred_type in ("xml", "both")
+        doi = paper["doi"]
+
+        if preferred_type == "both":
+            if pdf_file.exists() and xml_file.exists():
+                _record(
+                    doi,
+                    {
+                        "success": True,
+                        "method": "existing",
+                        "filetype": "pdf+xml",
+                        "pdf": {
+                            "success": True,
+                            "method": "existing",
+                            "filetype": "pdf",
+                        },
+                        "xml": {
+                            "success": True,
+                            "method": "existing",
+                            "filetype": "xml",
+                        },
+                    },
+                )
+                return
+        else:
+            if want_pdf and pdf_file.exists():
+                _record(
+                    doi,
+                    {"success": True, "method": "existing", "filetype": "pdf"},
+                )
+                return
+            if want_xml and xml_file.exists() and preferred_type == "xml":
+                _record(
+                    doi,
+                    {"success": True, "method": "existing", "filetype": "xml"},
+                )
+                return
+
         result = save_pdf(
             paper,
-            output_path,
+            str(pdf_file),
             save_metadata=save_metadata,
             api_keys=api_keys,
             preferred_type=preferred_type,
             mail=mail,
         )
-        doi = paper["doi"]
-        results_by_doi[doi] = result
-        if result and result.get("method"):
-            if result.get("success"):
-                counts_by_method[result["method"]] = (
-                    counts_by_method.get(result["method"], 0) + 1
-                )
-            else:
-                # track abstract-only separately
-                if result.get("method") == "abstract":
-                    counts_by_method["abstract_only"] = (
-                        counts_by_method.get("abstract_only", 0) + 1
-                    )
-        else:
-            counts_by_method["failed"] = counts_by_method.get("failed", 0) + 1
+        _record(doi, result)
+
+    workers = min(max_workers, max(len(papers), 1))
+    logger.info(
+        f"Downloading {len(papers)} papers with max_workers={workers} "
+        f"(publisher APIs rate-limited)."
+    )
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_process_one, paper) for paper in papers]
+        for fut in tqdm(
+            as_completed(futures), total=len(futures), desc="Processing papers"
+        ):
+            try:
+                fut.result()
+            except Exception as exc:
+                logger.error(f"Worker failed: {exc}")
 
     # Save stats to file in the target directory
     try:
@@ -593,20 +824,208 @@ def save_pdf_from_dump(
         with open(stats_path, "w", encoding="utf-8") as f:
             json.dump(stats, f, ensure_ascii=False, indent=2)
         logger.info(f"Saved fallback stats to {stats_path}")
+
+        import csv
+
+        report_path = Path(pdf_path) / "paper_download_report.csv"
+        with open(report_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "doi",
+                    "title",
+                    "journal",
+                    "year",
+                    "success",
+                    "filetype",
+                    "source",
+                    "wos_oa",
+                    "openalex_publisher",
+                    "openalex_is_oa",
+                ],
+            )
+            writer.writeheader()
+            for paper in papers:
+                doi = paper.get("doi")
+                if not doi:
+                    continue
+                result = results_by_doi.get(doi, {})
+                oa_meta = _OPENALEX_META_CACHE.get(_normalize_doi(doi)) or {}
+                writer.writerow(
+                    {
+                        "doi": doi,
+                        "title": paper.get("title") or paper.get("Title") or "",
+                        "journal": paper.get("journal") or "",
+                        "year": paper.get("date") or "",
+                        "success": bool(result.get("success")),
+                        "filetype": result.get("filetype") or "",
+                        "source": result.get("method") or "",
+                        "wos_oa": paper.get("oa") or "",
+                        "openalex_publisher": oa_meta.get("publisher") or "",
+                        "openalex_is_oa": oa_meta.get("is_oa"),
+                    }
+                )
+        logger.info(f"Saved per-paper report to {report_path}")
     except Exception as e:
         logger.error(f"Failed to write fallback stats: {e}")
 
     return {"counts": counts_by_method, "by_doi": results_by_doi}
 
 
-# Debug variants: try all fallbacks independently of order and record which work
-# New helpers (place near other helper functions in `paperscraper/pdf/pdf.py`)
+# Publisher gating via OpenAlex (batched), not Crossref.
+_OPENALEX_META_CACHE: Dict[str, Dict[str, Any]] = {}
+
+_PUBLISHER_API_RULES: Dict[str, Dict[str, Any]] = {
+    "wiley": {
+        "publisher_substrings": ("wiley", "blackwell", "john wiley"),
+    },
+    "springer": {
+        "publisher_substrings": (
+            "springer",
+            "springer nature",
+            "nature publishing",
+            "nature portfolio",
+            "biomed central",
+            "bmc",
+        ),
+    },
+    "elsevier": {
+        "publisher_substrings": ("elsevier", "cell press", "the lancet", "lancet"),
+    },
+}
+
+
+def _normalize_doi(doi: str) -> str:
+    d = (doi or "").strip()
+    for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
+        if d.lower().startswith(prefix):
+            d = d[len(prefix) :]
+            break
+    return d.strip()
+
+
+def _openalex_headers(mail: Optional[str] = None) -> Dict[str, str]:
+    contact = mail or "paperscraper@example.com"
+    return {
+        "User-Agent": f"paperscraper/1.0 (mailto:{contact})",
+        "Accept": "application/json",
+    }
+
+
+def prefetch_openalex_metadata(
+    dois: list,
+    api_keys: Optional[Dict[str, str]] = None,
+    mail: Optional[str] = None,
+    chunk_size: int = 50,
+    timeout: int = 60,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Batch-fetch OpenAlex work metadata (publisher + OA) for many DOIs.
+
+    Uses filter=doi:https://doi.org/A|https://doi.org/B with OPENALEX_API_KEY when set.
+    Results are stored in the module cache and returned as {doi: meta}.
+    """
+    api_keys = api_keys or {}
+    api_key = api_keys.get("OPENALEX_API_KEY")
+    unique = []
+    seen = set()
+    for doi in dois:
+        norm = _normalize_doi(doi)
+        if not norm or norm in seen:
+            continue
+        seen.add(norm)
+        unique.append(norm)
+
+    headers = _openalex_headers(mail)
+    for i in range(0, len(unique), chunk_size):
+        chunk = unique[i : i + chunk_size]
+        filter_dois = "|".join(f"https://doi.org/{d}" for d in chunk)
+        params: Dict[str, Any] = {
+            "filter": f"doi:{filter_dois}",
+            "per_page": max(len(chunk), 1),
+            "select": "doi,primary_location,open_access,best_oa_location",
+        }
+        if api_key:
+            params["api_key"] = api_key
+        elif mail:
+            params["mailto"] = mail
+
+        try:
+            resp = get_session().get(
+                "https://api.openalex.org/works",
+                params=params,
+                headers=headers,
+                timeout=timeout,
+            )
+            resp.raise_for_status()
+            results = resp.json().get("results") or []
+        except Exception as exc:
+            logger.error(f"OpenAlex batch publisher lookup failed: {exc}")
+            continue
+
+        for work in results:
+            raw_doi = _normalize_doi(work.get("doi") or "")
+            if not raw_doi:
+                continue
+            source = ((work.get("primary_location") or {}).get("source")) or {}
+            publisher = (
+                source.get("host_organization_name")
+                or source.get("display_name")
+                or source.get("host_organization")
+            )
+            oa = (work.get("open_access") or {})
+            best = work.get("best_oa_location") or {}
+            meta = {
+                "publisher": str(publisher) if publisher else None,
+                "is_oa": bool(oa.get("is_oa")) if oa else None,
+                "oa_status": oa.get("oa_status"),
+                "pdf_url": best.get("pdf_url") or (work.get("primary_location") or {}).get("pdf_url"),
+            }
+            _OPENALEX_META_CACHE[raw_doi] = meta
+            _OPENALEX_META_CACHE[raw_doi.lower()] = meta
+
+        # Mark misses in this chunk so we don't refetch endlessly.
+        for d in chunk:
+            key = d.lower()
+            if key not in _OPENALEX_META_CACHE and d not in _OPENALEX_META_CACHE:
+                _OPENALEX_META_CACHE[d] = {
+                    "publisher": None,
+                    "is_oa": None,
+                    "oa_status": "not_in_openalex",
+                    "pdf_url": None,
+                }
+                _OPENALEX_META_CACHE[key] = _OPENALEX_META_CACHE[d]
+
+        logger.info(
+            f"OpenAlex batch: fetched publishers for DOIs {i + 1}-{min(i + chunk_size, len(unique))} / {len(unique)}"
+        )
+
+    return {
+        d: _OPENALEX_META_CACHE.get(d) or _OPENALEX_META_CACHE.get(d.lower()) or {}
+        for d in unique
+    }
+
+
+def _get_openalex_publisher(
+    doi: str,
+    api_keys: Optional[Dict[str, str]] = None,
+    mail: Optional[str] = None,
+) -> Optional[str]:
+    """Return cached OpenAlex host_organization_name for a DOI, prefetching if needed."""
+    norm = _normalize_doi(doi)
+    meta = _OPENALEX_META_CACHE.get(norm) or _OPENALEX_META_CACHE.get(norm.lower())
+    if meta is None:
+        prefetch_openalex_metadata([norm], api_keys=api_keys, mail=mail)
+        meta = _OPENALEX_META_CACHE.get(norm) or _OPENALEX_META_CACHE.get(norm.lower()) or {}
+    return meta.get("publisher")
+
+
 def _get_redirect_domain(doi: str, timeout: int = 10) -> Optional[str]:
     """
     Resolve https://doi.org/{doi} and return the extracted domain (e.g. 'wiley') or None on failure.
     """
     try:
-        resp = requests.get(
+        resp = get_session().get(
             f"https://doi.org/{doi}", timeout=timeout, allow_redirects=True
         )
         resp.raise_for_status()
@@ -615,53 +1034,48 @@ def _get_redirect_domain(doi: str, timeout: int = 10) -> Optional[str]:
         return None
 
 
-def _crossref_publisher_is_wiley(doi: str, timeout: int = 10) -> bool:
+def _publisher_api_allowed(
+    doi: str,
+    publisher_key: str,
+    mail: Optional[str] = None,
+    final_url: Optional[str] = None,
+    timeout: int = 15,
+    api_keys: Optional[Dict[str, str]] = None,
+) -> bool:
     """
-    Query Crossref works API and return True if publisher name contains 'wiley' (case-insensitive).
+    Return True only if OpenAlex says this DOI belongs to the given publisher API.
+
+    Publisher comes from a batched OpenAlex lookup (host_organization_name).
     """
-    try:
-        url = f"https://api.crossref.org/works/{doi}"
-        resp = requests.get(url, timeout=timeout)
-        resp.raise_for_status()
-        publisher = resp.json().get("message", {}).get("publisher", "") or ""
-        return "wiley" in publisher.lower()
-    except Exception:
+    del final_url, timeout  # kept for call-site compatibility
+    rules = _PUBLISHER_API_RULES.get(publisher_key)
+    if not rules:
         return False
+
+    publisher = (_get_openalex_publisher(doi, api_keys=api_keys, mail=mail) or "").lower()
+    if not publisher:
+        return False
+    return any(s in publisher for s in rules.get("publisher_substrings", ()))
+
+
+def _crossref_publisher_is_wiley(
+    doi: str, timeout: int = 10, mail: Optional[str] = None
+) -> bool:
+    """Backward-compatible wrapper; now uses OpenAlex publisher matching."""
+    del timeout
+    return _publisher_api_allowed(doi, "wiley", mail=mail)
 
 
 def _wiley_allowed(
-    doi: str, final_url: Optional[str] = None, timeout: int = 10
+    doi: str,
+    final_url: Optional[str] = None,
+    timeout: int = 10,
+    mail: Optional[str] = None,
 ) -> bool:
-    """
-    Return True if it's reasonable to attempt the Wiley TDM fallback:
-    - either the DOI redirect domain contains 'wiley', or
-    - the Crossref publisher is Wiley.
-    """
-    # 1) check provided final_url if available
-    try:
-        if final_url:
-            domain = tldextract.extract(final_url).domain or ""
-            if "wiley" in domain.lower():
-                return True
-    except Exception:
-        pass
-
-    # 2) try resolving DOI redirect domain
-    try:
-        redirect_domain = _get_redirect_domain(doi, timeout=timeout)
-        if redirect_domain and "wiley" in redirect_domain.lower():
-            return True
-    except Exception:
-        pass
-
-    # 3) fallback to Crossref publisher check
-    try:
-        if _crossref_publisher_is_wiley(doi, timeout=timeout):
-            return True
-    except Exception:
-        pass
-
-    return False
+    """Return True if OpenAlex publisher indicates Wiley."""
+    return _publisher_api_allowed(
+        doi, "wiley", mail=mail, final_url=final_url, timeout=timeout
+    )
 
 
 def debug_save_pdf(
@@ -727,8 +1141,10 @@ def debug_save_pdf(
         try:
             if name == "unpaywall" and mail:
                 return FALLBACKS[name](doi, out, mail, None)
-            if name in ("europepmc", "doaj", "openalex", "arxiv"):
+            if name in ("europepmc", "doaj", "arxiv"):
                 return FALLBACKS[name](doi, out)
+            if name == "openalex":
+                return FALLBACKS[name](doi, out, api_keys=api_keys, mail=mail)
             if name == "crossref":
                 return FALLBACKS[name](doi, out, mail or "your_email@example.com")
             if name in ("s3", "medrxiv_s3"):
@@ -743,17 +1159,36 @@ def debug_save_pdf(
                 if name == "wiley":
                     if not api_keys.get("WILEY_TDM_API_TOKEN"):
                         return False
-                    # Only try Wiley when applicable
                     try:
-                        if not _wiley_allowed(doi):
+                        if not _publisher_api_allowed(
+                            doi, "wiley", mail=mail, api_keys=api_keys
+                        ):
                             return False
                     except Exception:
                         return False
-                if name == "springer" and not api_keys.get("SPRINGER_API_KEY"):
-                    return False
+                if name == "springer":
+                    if not (
+                        api_keys.get("SPRINGER_OPEN_ACCESS_API")
+                        or api_keys.get("SPRINGER_API_KEY")
+                    ):
+                        return False
+                    try:
+                        if not _publisher_api_allowed(
+                            doi, "springer", mail=mail, api_keys=api_keys
+                        ):
+                            return False
+                    except Exception:
+                        return False
                 return FALLBACKS[name](paper_metadata, out, api_keys)
             if name == "elsevier":
                 if not api_keys.get("ELSEVIER_TDM_API_KEY"):
+                    return False
+                try:
+                    if not _publisher_api_allowed(
+                        doi, "elsevier", mail=mail, api_keys=api_keys
+                    ):
+                        return False
+                except Exception:
                     return False
                 return FALLBACKS[name](
                     paper_metadata, out, api_keys, preferred_type=preferred_type

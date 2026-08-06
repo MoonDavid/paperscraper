@@ -12,7 +12,7 @@ import zipfile
 from collections import deque
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from pathlib import Path
-from typing import Any, Callable, Dict, Union
+from typing import Any, Callable, Dict, Optional, Union
 from urllib.parse import quote
 
 import boto3
@@ -21,6 +21,8 @@ from botocore.client import BaseClient
 from botocore.config import Config
 from lxml import etree
 from tqdm import tqdm
+
+from .utils import get_session
 
 ELIFE_XML_INDEX = None  # global variable to cache the eLife XML index from GitHub
 
@@ -31,6 +33,40 @@ logger = logging.getLogger(__name__)
 
 class NCBIRateLimitError(RuntimeError):
     """Raised when NCBI returns a rate-limit response."""
+
+
+class TokenBucketRateLimiter:
+    """Simple thread-safe token-bucket limiter (requests per second)."""
+
+    def __init__(self, rate_per_sec: float, capacity: Optional[float] = None):
+        self._rate = float(rate_per_sec)
+        self._capacity = float(capacity if capacity is not None else rate_per_sec)
+        self._tokens = self._capacity
+        self._last = time.time()
+        self._lock = threading.Lock()
+
+    def wait(self) -> None:
+        while True:
+            with self._lock:
+                now = time.time()
+                self._tokens = min(
+                    self._capacity,
+                    self._tokens + (now - self._last) * self._rate,
+                )
+                self._last = now
+                if self._tokens >= 1.0:
+                    self._tokens -= 1.0
+                    return
+                sleep_for = (1.0 - self._tokens) / self._rate
+            time.sleep(max(sleep_for, 0.01))
+
+
+# Conservative shared limiters for concurrent paper downloads.
+_elsevier_rate_limiter = TokenBucketRateLimiter(rate_per_sec=2.0, capacity=2.0)
+_unpaywall_rate_limiter = TokenBucketRateLimiter(rate_per_sec=8.0, capacity=8.0)
+_europepmc_rate_limiter = TokenBucketRateLimiter(rate_per_sec=3.0, capacity=3.0)
+_ncbi_rate_limiter = TokenBucketRateLimiter(rate_per_sec=2.0, capacity=2.0)
+_openalex_rate_limiter = TokenBucketRateLimiter(rate_per_sec=8.0, capacity=8.0)
 
 
 def _is_pdf_bytes(content: Any) -> bool:
@@ -160,9 +196,8 @@ def fallback_wiley_api(
                 logger.info(f"Wiley API rate limit: waiting {wait_time:.1f} seconds...")
                 time.sleep(wait_time)
 
-            api_response = requests.get(
-                api_url, headers=headers, allow_redirects=True, timeout=60
-            )
+            api_response = get_session().get(
+                api_url, headers=headers, allow_redirects=True            )
             api_response.raise_for_status()
 
             if api_response.content[:4] != b"%PDF":
@@ -190,6 +225,10 @@ def fallback_wiley_api(
                 logger.error(
                     f"Wiley API HTTP error (attempt {attempt + 1}/{max_attempts}): {e}"
                 )
+                status = e.response.status_code if e.response is not None else None
+                if status is not None and 400 <= status < 500:
+                    # Missing entitlement or unknown DOI; retrying cannot succeed.
+                    break
                 if attempt < max_attempts - 1:
                     time.sleep(5)  # Brief pause before retry
         except Exception as e:
@@ -245,9 +284,9 @@ def fallback_bioc_pmc(
     pmcid = None
     for attempt in range(1, max_attempts + 1):
         try:
-            conv_response = requests.get(
-                converter_url, params=params, headers=headers, timeout=60
-            )
+            _ncbi_rate_limiter.wait()
+            conv_response = get_session().get(
+                converter_url, params=params, headers=headers            )
             if conv_response.status_code == 429:
                 raise NCBIRateLimitError(
                     f"NCBI rate-limited DOI to PMCID conversion for {doi}"
@@ -284,7 +323,8 @@ def fallback_bioc_pmc(
     logger.info(f"Attempting to download XML from BioC-PMC URL: {xml_url}")
     for attempt in range(1, max_attempts + 1):
         try:
-            xml_response = requests.get(xml_url, headers=headers, timeout=60)
+            _ncbi_rate_limiter.wait()
+            xml_response = get_session().get(xml_url, headers=headers)
             if xml_response.status_code == 429:
                 raise NCBIRateLimitError(
                     f"NCBI rate-limited BioC-PMC XML download for {doi}"
@@ -362,7 +402,8 @@ def fallback_elsevier_api(
     )
 
     try:
-        response = requests.get(api_url, headers=headers, timeout=60)
+        _elsevier_rate_limiter.wait()
+        response = get_session().get(api_url, headers=headers)
 
         if response.status_code in [401, 403]:
             error_text = response.text
@@ -434,7 +475,7 @@ def fallback_elife_xml(doi: str, output_path: Path) -> bool:
         latest_version, latest_download_url = candidate_files[0]
 
     try:
-        r = requests.get(latest_download_url, timeout=60)
+        r = get_session().get(latest_download_url)
         r.raise_for_status()
         latest_xml = r.content
     except Exception as e:
@@ -461,7 +502,7 @@ def _direct_elife_xml_candidates(article_num: str) -> list:
     for version in range(1, 8):
         download_url = f"{base_url}/articles/elife-{article_num}-v{version}.xml"
         try:
-            response = requests.head(download_url, allow_redirects=True, timeout=20)
+            response = get_session().head(download_url, allow_redirects=True, timeout=20)
             if response.status_code == 200:
                 candidates.append((version, download_url))
         except requests.RequestException as e:
@@ -490,7 +531,7 @@ def get_elife_xml_index() -> dict:
         base_tree_url = "https://api.github.com/repos/elifesciences/elife-article-xml/git/trees/master?recursive=1"
         for attempt in range(1, 4):
             try:
-                r = requests.get(base_tree_url, timeout=60)
+                r = get_session().get(base_tree_url)
                 r.raise_for_status()
                 break
             except requests.RequestException as e:
@@ -533,7 +574,7 @@ def month_folder(doi: str) -> str:
         Month and year in format `October_2019`
     """
     url = f"https://api.biorxiv.org/details/biorxiv/{doi}/na/json"
-    resp = requests.get(url, timeout=30)
+    resp = get_session().get(url, timeout=30)
     resp.raise_for_status()
     date_str = resp.json()["collection"][0]["date"]
     date = datetime.date.fromisoformat(date_str)
@@ -788,7 +829,8 @@ def fallback_unpaywall(
         output_path = Path(output_path)
     unpaywall_url = f"https://api.unpaywall.org/v2/{doi}?email={mail}"
     try:
-        response = requests.get(unpaywall_url, timeout=60)
+        _unpaywall_rate_limiter.wait()
+        response = get_session().get(unpaywall_url)
         response.raise_for_status()
         data = response.json()
         if not data.get("is_oa", False):
@@ -802,7 +844,7 @@ def fallback_unpaywall(
             return False
 
         if pdf_url:
-            pdf_response = requests.get(pdf_url, timeout=60)
+            pdf_response = get_session().get(pdf_url)
             pdf_response.raise_for_status()
             if pdf_response.content[:4] == b"%PDF":
                 with open(output_path.with_suffix(".pdf"), "wb+") as f:
@@ -820,15 +862,82 @@ def fallback_unpaywall(
         return False
 
 
+def _redact_api_key(text: str) -> str:
+    """Remove api_key query values from log/error strings."""
+    return re.sub(r"(api_key=)[^&\s]+", r"\1***", str(text), flags=re.IGNORECASE)
+
+
+def _springer_pdf_url_from_record(record: Dict[str, Any]) -> Optional[str]:
+    """Extract a PDF URL from a Springer Nature API record."""
+    urls = record.get("url")
+    if not urls:
+        return None
+    if isinstance(urls, str):
+        return urls
+    if isinstance(urls, dict):
+        urls = [urls]
+    if not isinstance(urls, list):
+        return None
+
+    candidates: list[str] = []
+    for entry in urls:
+        if isinstance(entry, str):
+            candidates.append(entry)
+            continue
+        if not isinstance(entry, dict):
+            continue
+        value = entry.get("value") or entry.get("url")
+        if not value:
+            continue
+        fmt = str(entry.get("format") or "").lower()
+        if "pdf" in fmt or str(value).lower().endswith(".pdf"):
+            return value
+        candidates.append(value)
+    return candidates[0] if candidates else None
+
+
+def _download_springer_pdf_from_api(
+    api_url: str,
+    output_path: Path,
+    doi: str,
+    method_label: str,
+) -> bool:
+    """Query a Springer Nature JSON endpoint and download a PDF if found."""
+    response = get_session().get(api_url)
+    response.raise_for_status()
+    data = response.json()
+    records = data.get("records") or []
+    if not records:
+        return False
+
+    pdf_url = _springer_pdf_url_from_record(records[0])
+    if not pdf_url:
+        return False
+
+    pdf_response = get_session().get(pdf_url)
+    pdf_response.raise_for_status()
+    if pdf_response.content[:4] != b"%PDF":
+        logger.warning(f"{method_label} URL for {doi} did not return a valid PDF.")
+        return False
+
+    with open(output_path.with_suffix(".pdf"), "wb+") as f:
+        f.write(pdf_response.content)
+    logger.info(f"Successfully downloaded PDF via {method_label} for {doi}.")
+    return True
+
+
 def fallback_springer_api(
     paper_metadata: Dict[str, Any],
     output_path: Path,
     api_keys: Dict[str, str],
 ) -> bool:
     """
-    Attempt to download the PDF via the Springer Nature API.
-    This function uses the SPRINGER_API_KEY environment variable to authenticate.
-    See https://dev.springernature.com/ for details on how to get an API key.
+    Attempt to download the PDF via the Springer Nature Open Access API only.
+
+    Uses ``SPRINGER_OPEN_ACCESS_API`` (or ``SPRINGER_API_KEY`` as an alias for the
+    same Open Access endpoint). Does not call the Metadata / TDM APIs.
+    See https://dev.springernature.com/docs/api-endpoints/open-access/
+
     Args:
         paper_metadata (dict): Dictionary containing paper metadata. Must include the 'doi' key.
         output_path (Path): A pathlib.Path object representing the path where the PDF will be saved.
@@ -836,63 +945,38 @@ def fallback_springer_api(
     Returns:
         bool: True if the PDF file was successfully downloaded, False otherwise.
     """
-    springer_api_key = api_keys.get("SPRINGER_API_KEY")
-    if not springer_api_key:
-        logger.info("No Springer API key found, skipping Springer fallback.")
+    oa_key = api_keys.get("SPRINGER_OPEN_ACCESS_API") or api_keys.get("SPRINGER_API_KEY")
+    if not oa_key:
+        logger.info("No Springer Open Access API key found, skipping Springer fallback.")
         return False
 
     doi = paper_metadata["doi"]
-    # Try open access endpoint first
-    api_url = f"https://api.springernature.com/openaccess/v2/json?q=doi:{doi}&api_key={springer_api_key}"
-    try:
-        response = requests.get(api_url, timeout=60)
-        response.raise_for_status()
-        data = response.json()
-        if data.get("records"):
-            pdf_url = data["records"][0].get("url")
-            if pdf_url:
-                # The URL is often a list, take the first one which is usually the PDF
-                if isinstance(pdf_url, list):
-                    pdf_url = pdf_url[0]["url"]
-
-                pdf_response = requests.get(pdf_url, timeout=60)
-                pdf_response.raise_for_status()
-                if pdf_response.content[:4] == b"%PDF":
-                    with open(output_path.with_suffix(".pdf"), "wb+") as f:
-                        f.write(pdf_response.content)
-                    logger.info(
-                        f"Successfully downloaded PDF via Springer Open Access API for {doi}."
-                    )
-                    return True
-
-    except Exception as e:
-        logger.info(
-            f"Springer Open Access API failed for {doi}: {e}. Trying metadata API."
-        )
-
-    # Fallback to metadata API (TDM)
-    api_url = f"https://api.springernature.com/metadata/v2/json?q=doi:{doi}&api_key={springer_api_key}"
-    try:
-        response = requests.get(api_url, timeout=60)
-        response.raise_for_status()
-        data = response.json()
-        if data.get("records"):
-            pdf_url = data["records"][0].get("url")
-            if pdf_url:
-                if isinstance(pdf_url, list):
-                    pdf_url = pdf_url[0]["url"]
-
-                pdf_response = requests.get(pdf_url, timeout=60)
-                pdf_response.raise_for_status()
-                if pdf_response.content[:4] == b"%PDF":
-                    with open(output_path.with_suffix(".pdf"), "wb+") as f:
-                        f.write(pdf_response.content)
-                    logger.info(
-                        f"Successfully downloaded PDF via Springer Metadata API for {doi}."
-                    )
-                    return True
-    except Exception as e:
-        logger.error(f"Could not download via Springer API for {doi}: {e}")
+    oa_endpoints = (
+        "https://api.springernature.com/openaccess/json",
+        "https://api.springernature.com/openaccess/v2/json",
+    )
+    for endpoint in oa_endpoints:
+        api_url = f"{endpoint}?q=doi:{doi}&api_key={oa_key}"
+        try:
+            if _download_springer_pdf_from_api(
+                api_url,
+                output_path,
+                doi,
+                "Springer Open Access API",
+            ):
+                return True
+        except requests.exceptions.HTTPError as e:
+            logger.info(
+                f"Springer Open Access API failed for {doi} via {endpoint}: {_redact_api_key(e)}"
+            )
+            status = e.response.status_code if e.response is not None else None
+            if status == 404:
+                # Not in the Springer OA corpus; the other endpoint cannot have it.
+                break
+        except Exception as e:
+            logger.info(
+                f"Springer Open Access API failed for {doi} via {endpoint}: {_redact_api_key(e)}"
+            )
 
     return False
 
@@ -925,7 +1009,7 @@ def fallback_plos_api(doi: str, output_path: Path) -> bool:
 
         pdf_url = f"https://journals.plos.org/{journal_name}/article/file?id={doi}&type=printable"
 
-        pdf_response = requests.get(pdf_url, timeout=60)
+        pdf_response = get_session().get(pdf_url)
         pdf_response.raise_for_status()
         if pdf_response.content[:4] == b"%PDF":
             with open(output_path.with_suffix(".pdf"), "wb+") as f:
@@ -962,7 +1046,8 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
     search_params = {"query": f'DOI:"{doi}"', "format": "json", "resultType": "core"}
 
     try:
-        search_response = requests.get(search_url, params=search_params, timeout=60)
+        _europepmc_rate_limiter.wait()
+        search_response = get_session().get(search_url, params=search_params)
         search_response.raise_for_status()
         search_data = search_response.json()
 
@@ -996,7 +1081,8 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
     xml_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/{pmcid}/fullTextXML"
 
     try:
-        xml_response = requests.get(xml_url, timeout=60)
+        _europepmc_rate_limiter.wait()
+        xml_response = get_session().get(xml_url)
         xml_response.raise_for_status()
 
         # Check if we got valid XML content
@@ -1018,14 +1104,32 @@ def fallback_europepmc(doi: str, output_path: Path) -> bool:
         return False
 
 
-def fallback_openalex(doi: str, output_path: Path) -> bool:
+def fallback_openalex(
+    doi: str,
+    output_path: Path,
+    api_keys: Optional[Dict[str, str]] = None,
+    mail: Optional[str] = None,
+) -> bool:
     """
     Use OpenAlex to locate an OA PDF for a DOI.
     https://api.openalex.org/works/doi:{doi}
     """
     try:
         url = f"https://api.openalex.org/works/doi:{quote(doi)}"
-        r = requests.get(url, timeout=60)
+        params: Dict[str, str] = {}
+        api_keys = api_keys or {}
+        if api_keys.get("OPENALEX_API_KEY"):
+            params["api_key"] = api_keys["OPENALEX_API_KEY"]
+        elif mail:
+            params["mailto"] = mail
+        headers = {
+            "User-Agent": (
+                f"paperscraper/1.0 (mailto:{mail or 'paperscraper@example.com'})"
+            ),
+            "Accept": "application/json",
+        }
+        _openalex_rate_limiter.wait()
+        r = get_session().get(url, params=params or None, headers=headers)
         if r.status_code == 404:
             logger.info(f"OpenAlex: no record for {doi}")
             return False
@@ -1045,7 +1149,7 @@ def fallback_openalex(doi: str, output_path: Path) -> bool:
             logger.info(f"OpenAlex: no OA PDF for {doi}")
             return False
 
-        pdf = requests.get(pdf_url, timeout=60)
+        pdf = get_session().get(pdf_url)
         pdf.raise_for_status()
         if not _write_pdf_bytes(output_path, pdf.content):
             logger.warning(f"OpenAlex PDF URL did not return a PDF for {doi}")
@@ -1067,7 +1171,7 @@ def fallback_crossref_links(
     try:
         url = f"https://api.crossref.org/works/{quote(doi)}"
         headers = {"User-Agent": f"paperscraper (mailto:{contact_email})"}
-        r = requests.get(url, headers=headers, timeout=60)
+        r = get_session().get(url, headers=headers)
         r.raise_for_status()
         msg = r.json().get("message", {})
         links = msg.get("link", []) or []
@@ -1087,7 +1191,7 @@ def fallback_crossref_links(
             if not pdf_url:
                 continue
             try:
-                pdf = requests.get(pdf_url, headers=headers, timeout=60)
+                pdf = get_session().get(pdf_url, headers=headers)
                 pdf.raise_for_status()
                 if _write_pdf_bytes(output_path, pdf.content):
                     logger.info(
@@ -1111,7 +1215,7 @@ def fallback_arxiv(doi: str, output_path: Path) -> bool:
         # arXiv Atom API supports DOI query
         q = quote(f'doi:"{doi}"')
         url = f"http://export.arxiv.org/api/query?search_query={q}&max_results=1"
-        r = requests.get(url, timeout=60)
+        r = get_session().get(url)
         r.raise_for_status()
         root = etree.fromstring(r.content)
         ns = {"a": "http://www.w3.org/2005/Atom"}
@@ -1124,7 +1228,7 @@ def fallback_arxiv(doi: str, output_path: Path) -> bool:
             logger.info(f"arXiv: unexpected entry URL for {doi}: {abs_url}")
             return False
         pdf_url = abs_url.replace("/abs/", "/pdf/") + ".pdf"
-        pdf = requests.get(pdf_url, timeout=60)
+        pdf = get_session().get(pdf_url)
         pdf.raise_for_status()
         if not _write_pdf_bytes(output_path, pdf.content):
             logger.warning(f"arXiv URL did not return a PDF for {doi}")
@@ -1141,7 +1245,7 @@ def month_folder_medrxiv(doi: str) -> str:
     Get medRxiv posting month folder, rolling over last-day postings to next month.
     """
     url = f"https://api.medrxiv.org/details/medrxiv/{doi}/na/json"
-    resp = requests.get(url, timeout=30)
+    resp = get_session().get(url, timeout=30)
     resp.raise_for_status()
     date_str = resp.json()["collection"][0]["date"]
     date = datetime.date.fromisoformat(date_str)
@@ -1233,7 +1337,7 @@ def fallback_doaj(doi: str, output_path: Path) -> bool:
     """
     try:
         url = f"https://doaj.org/api/v2/search/articles/doi:{quote(doi)}"
-        r = requests.get(url, timeout=60)
+        r = get_session().get(url)
         r.raise_for_status()
         results = r.json().get("results", []) or []
         for res in results:
@@ -1245,7 +1349,7 @@ def fallback_doaj(doi: str, output_path: Path) -> bool:
                 if not pdf_url:
                     continue
                 try:
-                    pdf = requests.get(pdf_url, timeout=60)
+                    pdf = get_session().get(pdf_url)
                     pdf.raise_for_status()
                     if not _write_pdf_bytes(output_path, pdf.content):
                         continue
