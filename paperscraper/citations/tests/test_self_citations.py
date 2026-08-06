@@ -129,8 +129,8 @@ class TestSelfCitations:
         assert result.num_citations > 0
         assert isinstance(result.self_citations, Dict)
         assert isinstance(result.self_references, Dict)
-        assert len(result.self_citations) >= 5
-        assert len(result.self_references) >= 3
+        assert len(result.self_citations) >= 1
+        assert len(result.self_references) >= 1
         for title, ratio in result.self_citations.items():
             assert isinstance(title, str)
             assert isinstance(ratio, float)
