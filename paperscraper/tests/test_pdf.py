@@ -103,11 +103,18 @@ class TestPDF:
         if os.path.exists("clm_chapter.json"):
             os.remove("clm_chapter.json")
 
-        # journal without OA paper
+        # Publisher paywalled; may still succeed via Europe PMC PDF fallback.
         paper_data = {"doi": "10.1126/science.adk9587"}
-        save_file(paper_data, filepath="color", save_metadata=True)
-        assert not os.path.exists("color.pdf")
-        assert not os.path.exists("color.json")
+        res = save_file(paper_data, filepath="color", save_metadata=True)
+        assert res.get("method") != "direct"
+        if res.get("success"):
+            assert res.get("method") == "europepmc"
+            assert os.path.exists("color.pdf")
+            os.remove("color.pdf")
+        else:
+            assert not os.path.exists("color.pdf")
+        if os.path.exists("color.json"):
+            os.remove("color.json")
 
     def test_missing_doi(self):
         with pytest.raises(KeyError):

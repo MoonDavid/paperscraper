@@ -53,7 +53,8 @@ jobs:
         with:
           files: coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          # Don't fail the job on Codecov rate limits / missing token.
+          fail_ci_if_error: false
 
   test-potential-wheel-install:
     runs-on: ubuntu-latest
