@@ -23,3 +23,6 @@ jobs:
         uses: codespell-project/codespell-problem-matcher@v1
       - name: Codespell
         uses: codespell-project/actions-codespell@v2
+        with:
+          # Action `skip` overrides .codespellrc; keep generated download dumps out of spellcheck.
+          skip: ./.git,./artifacts
